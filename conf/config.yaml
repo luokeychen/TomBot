@@ -1,0 +1,9 @@
+name = 'Tom'
+
+http_port = 3333
+log.level = 'debug'
+
+adapter = 'qq'
+
+redis_server = '127.0.0.1'
+redis_port = 9673

@@ -2,10 +2,10 @@
  * @file   cli.c
  * @author mathslinux <riegamaths@gmail.com>
  * @date   Sat Jun 16 01:58:17 2012
- * 
+ *
  * @brief  Command Line Interface for Lwqq
- * 
- * 
+ *
+ *
  */
 
 #include <string.h>
@@ -19,6 +19,8 @@
 
 #include "lwqq.h"
 
+#include <czmq.h>
+
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -29,9 +31,7 @@
 static int help_f(int argc, char **argv);
 static int quit_f(int argc, char **argv);
 static int list_f(int argc, char **argv);
-static int send_f(int argc, char **argv);
-static int send_d(int argc, char **argv);
-static int send_g(int argc, char **argv);
+static int send_message(int type, const char* to, const char *content);
 static int exit_f(int argc, char **argv);
 
 typedef int (*cfunc_t)(int argc, char **argv);
@@ -46,16 +46,6 @@ static LwqqClient *lc = NULL;
 
 static char *progname;
 
-static CmdInfo cmdtab[] = {
-    {"help", "h", help_f},
-    {"quit", "q", quit_f},
-    {"list", "l", list_f},
-    {"send", "s", send_f},
-    {"sendd", "d", send_d},
-    {"sendg", "g", send_g},
-    {"exit", "e", exit_f},
-    {NULL, NULL, NULL},
-};
 #ifdef WIN32
 char *strtok_r(char *str, const char *delim, char **save)
 {
@@ -109,7 +99,7 @@ static int help_f(int argc, char **argv)
         "            You can use \"send uin message\" to send message\n"
         "            to buddy"
         "\n");
-    
+
     return 0;
 }
 
@@ -195,68 +185,44 @@ static int list_f(int argc, char **argv)
             }
         }
     }
-	
+
 
     return 0;
 }
-static int send_g(int argc, char **argv)
+
+static int send_message(int type, const char* to, const char *data)
 {
-    /* argv look like: {"send", "74357485" "hello"} */
-    if (argc != 3) {
-        return 0;
-    }
-    
-    lwqq_msg_send_simple(lc,LWQQ_MS_GROUP_MSG, argv[1], argv[2]);
-    
-    return 0;
-}
-static int send_d(int argc, char **argv)
-{
-    LwqqMsg* msg;
-    msg = lwqq_msg_new(LWQQ_MS_GROUP_MSG);
+    LwqqMsg *msg = lwqq_msg_new(type);
     LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
-    mmsg->super.to = s_strdup(argv[1]);
-    msg->type = LWQQ_MS_DISCU_MSG;
-    mmsg->discu.did = argv[1];
+    if (type == LWQQ_MS_DISCU_MSG) {
+        msg->type = LWQQ_MS_DISCU_MSG;
+        mmsg->discu.did = s_strdup(to);
 
+    } else if (type == LWQQ_MS_GROUP_MSG) {
+        msg->type = LWQQ_MS_GROUP_MSG;
+        mmsg->group.group_code = s_strdup(to);
+
+    }
+
+    mmsg->super.to = s_strdup(to);
+    mmsg->f_name = "微软雅黑";
+    mmsg->f_size = 10;
+    mmsg->f_style = 0;
+    strcpy(mmsg->f_color,"000000");
     LwqqMsgContent * c = s_malloc(sizeof(*c));
     c->type = LWQQ_CONTENT_STRING;
-    c->data.str = s_strdup(argv[2]);
-    mmsg->f_name = "微软雅黑";
-    mmsg->f_size = 13;
-    mmsg->f_style = 0;
+    c->data.str = s_strdup(data);
+
     TAILQ_INSERT_TAIL(&mmsg->content,c,entries);
 
-    lwqq_msg_send(lc, mmsg);
-    /* argv look like: {"send", "74357485" "hello"} */
-    if (argc != 3) {
-        return 0;
-    }
-    
-/*    lwqq_msg_send_simple(lc,LWQQ_MS_DISCU_MSG, argv[1], argv[2]);*/
-    
+    LWQQ_SYNC_BEGIN(lc);
+    lwqq_msg_send(lc,mmsg);
+    LWQQ_SYNC_END(lc);
+
+    mmsg->f_name = NULL;
+
+    lwqq_msg_free(msg);
     return 0;
-}
-
-static int send_f(int argc, char **argv)
-{
-    /* argv look like: {"send", "74357485" "hello"} */
-    if (argc != 3) {
-        return 0;
-    }
-    
-    lwqq_msg_send_simple(lc,LWQQ_MS_BUDDY_MSG, argv[1], argv[2]);
-    
-    return 0;
-}
-
-static char *get_prompt(void)
-{
-	static char	prompt[256];
-
-	if (!prompt[0])
-		snprintf(prompt, sizeof(prompt), "%s> ", progname);
-	return prompt;
 }
 
 static LwqqErrorCode cli_login()
@@ -281,12 +247,12 @@ failed:
 static void cli_logout(LwqqClient *lc)
 {
     LwqqErrorCode err;
-    
+
     lwqq_logout(lc, &err);
     if (err != LWQQ_EC_OK) {
-        lwqq_log(LOG_DEBUG, "Logout failed\n");        
+/*        lwqq_log(LOG_DEBUG, "Logout failed\n");*/
     } else {
-        lwqq_log(LOG_DEBUG, "Logout sucessfully\n");
+/*        lwqq_log(LOG_DEBUG, "Logout sucessfully\n");*/
     }
 }
 
@@ -307,21 +273,77 @@ static void usage()
 
 void signal_handler(int signum)
 {
-	if (signum == SIGINT) {
-        cli_logout(lc);
-        lwqq_client_free(lc);
-        exit(0);
+	if (signum == SIGINT || signum == SIGTERM) {
+            cli_logout(lc);
+            lwqq_client_free(lc);
+            exit(0);
 	}
+}
+
+
+//TODO 增加图片支持
+static void* handle_pull_msg()
+{
+    zctx_t *ctx = zctx_new();
+    void *pull = zsocket_new(ctx, ZMQ_PULL);
+    zsocket_connect(pull, "ipc:///tmp/push.ipc");
+    zclock_sleep(200);
+    zmsg_t *msg = zmsg_new();
+    zframe_t *frame = zframe_new(NULL, -1);
+
+    char* content;
+    char* id;
+    char* type;
+    int i_type;
+    int i_id;
+
+    while(1)
+    {
+        msg = zmsg_recv(pull);
+        frame = zmsg_first(msg);
+        content = zframe_strdup(frame);
+        frame = zmsg_next(msg);
+        id = zframe_strdup(frame);
+        frame = zmsg_last(msg);
+        type = zframe_strdup(frame);
+        printf("receive message from engine: %s, %s, %s\n", content, id, type);
+        i_type = atoi(type);
+        printf("i_type: %d\n", i_type);
+        i_id = atoi(id);
+        if (i_type == LWQQ_MS_BUDDY_MSG) {
+            send_message(LWQQ_MS_BUDDY_MSG, id, content);
+        } else if (i_type == LWQQ_MS_DISCU_MSG)
+            send_message(LWQQ_MS_DISCU_MSG, id, content);
+        else if (i_type == LWQQ_MS_GROUP_MSG)
+            send_message(LWQQ_MS_GROUP_MSG, id, content);
+        else
+            continue;
+        
+        free(content);
+        free(id);
+        free(type);
+    }
+
+    pthread_exit(NULL);
+    return NULL;
+
 }
 
 static void handle_new_msg(LwqqRecvMsg *recvmsg)
 {
     LwqqMsg *msg = recvmsg->msg;
-	char buf[2048] = {0};
+    char buf[2048] = {0};
+    zctx_t *ctx = zctx_new();
+    void *pub = zsocket_new(ctx, ZMQ_PUB);
+    zsocket_connect(pub, "ipc:///tmp/publish.ipc");
+    zclock_sleep(200);
+    zmsg_t *z_msg = zmsg_new();
+    assert(msg);
+
 
     printf("Receive message type: %d\n", msg->type);
     if (msg->type == LWQQ_MS_BUDDY_MSG) {
-        
+
         LwqqMsgContent *c;
         LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
         TAILQ_FOREACH(c, &mmsg->content, entries) {
@@ -332,9 +354,18 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
             }
         }
         printf("Receive message: %s\n", charset(buf));
+
+        zmsg_addmem(z_msg, buf, strlen(buf));
+        char* uin = mmsg->buddy.from->uin;
+        zmsg_addmem(z_msg, uin, strlen(uin));
+        char msg_type[5];
+        sprintf(msg_type, "%d", LWQQ_MS_BUDDY_MSG);
+        zmsg_addmem(z_msg, msg_type, strlen(msg_type));
+        zmsg_send(&z_msg, pub);
+
     } else if (msg->type == LWQQ_MS_GROUP_MSG) {
         LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
-        
+
         LwqqMsgContent *c;
         TAILQ_FOREACH(c, &mmsg->content, entries) {
             if (c->type == LWQQ_CONTENT_STRING) {
@@ -344,16 +375,45 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
             }
         }
         printf("Receive message: %s\n", charset(buf));
+        z_msg = zmsg_new();
+        zmsg_addmem(z_msg, buf, strlen(buf));
+        char* group_code = mmsg->group.group_code;
+        zmsg_addmem(z_msg, group_code, strlen(group_code));
+        char msg_type[5];
+        sprintf(msg_type, "%d", LWQQ_MS_GROUP_MSG);
+        zmsg_addmem(z_msg, msg_type, strlen(msg_type));
+        zmsg_send(&z_msg, pub);
+    } else if (msg->type == LWQQ_MS_DISCU_MSG) {
+        LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
+
+        LwqqMsgContent *c;
+        TAILQ_FOREACH(c, &mmsg->content, entries) {
+            if (c->type == LWQQ_CONTENT_STRING) {
+                strcat(buf, c->data.str);
+            } else {
+                printf ("Receive face msg: %d\n", c->data.face);
+            }
+        }
+        printf("Receive message: %s\n", charset(buf));
+        z_msg = zmsg_new();
+        zmsg_addmem(z_msg, buf, strlen(buf));
+        char* did = mmsg->discu.did;
+        zmsg_addmem(z_msg, did, strlen(did));
+        char msg_type[5];
+        sprintf(msg_type, "%d", LWQQ_MS_DISCU_MSG);
+        zmsg_addmem(z_msg, msg_type, strlen(msg_type));
+        zmsg_send(&z_msg, pub);
     } else if (msg->type == LWQQ_MT_STATUS_CHANGE) {
         LwqqMsgStatusChange *status = (LwqqMsgStatusChange*)msg;
-        printf("Receive status change: %s - > %s\n", 
+        printf("Receive status change: %s - > %s\n",
                status->who,
                status->status);
     } else {
         printf("unknow message\n");
     }
-    
+
     lwqq_msg_free(recvmsg->msg);
+    zmsg_destroy(&z_msg);
     s_free(recvmsg);
 }
 
@@ -378,7 +438,8 @@ static void *recvmsg_thread(void *list)
         TAILQ_REMOVE(&l->head,recvmsg, entries);
         pthread_mutex_unlock(&l->mutex);
         handle_new_msg(recvmsg);
-		fflush(stdout);
+
+	fflush(stdout);
     }
 
     pthread_exit(NULL);
@@ -410,71 +471,23 @@ static char **breakline(char *input, int *count)
         rval[c] = NULL;
         token = strtok_r(NULL, " ", &save_ptr);
 	}
-    
+
     *count = c;
 
     if (c == 0) {
         free(rval);
         return NULL;
     }
-    
+
     return rval;
 }
 
-const CmdInfo *find_command(const char *cmd)
-{
-	CmdInfo	*ct;
-
-	for (ct = cmdtab; ct->name; ct++) {
-		if (!strcmp(ct->name, cmd) || !strcmp(ct->altname, cmd)) {
-			return (const CmdInfo *)ct;
-        }
-	}
-	return NULL;
-}
-
-static void command_loop()
-{
-    static char command[1024];
-    int done = 0;
-
-    while (!done) {
-        char **v;
-        char *p;
-        int c = 0;
-        const CmdInfo *ct;
-        fprintf(stdout, "%s", get_prompt());
-        fflush(stdout);
-        memset(&command, 0, sizeof(command));
-        if (!fgets(command, sizeof(command), stdin)) {
-            /* Avoid gcc warning */
-            continue;
-        }
-        p = command + strlen(command);
-        if (p != command && p[-1] == '\n') {
-            p[-1] = '\0';
-        }
-        
-        v = breakline(command, &c);
-        if (v) {
-            ct = find_command(v[0]);
-            if (ct) {
-                done = ct->cfunc(c, v);
-            } else {
-                fprintf(stderr, "command \"%s\" not found\n", v[0]);
-            }
-            free(v);
-        }
-		fflush(stdout);
-		fflush(stderr);
-    }
-}
 
 static void need_verify2(LwqqClient* lc,LwqqVerifyCode* code)
 {
     #ifdef WIN32
     const char *dir = NULL;
-    
+
     #else
     const char *dir = "/tmp";
     #endif
@@ -484,9 +497,9 @@ static void need_verify2(LwqqClient* lc,LwqqVerifyCode* code)
 
     lwqq_util_save_img(code->data,code->size,fname,dir);
 
-    lwqq_log(LOG_NOTICE,"Need verify code to login, please check "
-            "image file %s%s, and input below.\n",
-            dir?:"",fname);
+/*    lwqq_log(LOG_NOTICE,"Need verify code to login, please check "*/
+/*            "image file %s%s, and input below.\n",*/
+/*            dir?:"",fname);*/
     printf("Verify Code:");
 	fflush(stdout);
     scanf("%s",vcode);
@@ -504,21 +517,16 @@ static LwqqAction act = {
     .need_verify2 = need_verify2
 };
 
-int main(int argc, char *argv[])
+int main()
 {
 
-	lwqq_log_redirect(log_direct_flush);
+    lwqq_log_redirect(log_direct_flush);
 
     char *qqnumber = "1744611347", *password = "jay19880821";
     LwqqErrorCode err;
     int i, c, e = 0;
-    pthread_t tid[2];
-    pthread_attr_t attr[2];
-    
-/*    if (argc == 1) {*/
-/*        usage();*/
-/*        exit(1);*/
-/*    }*/
+    pthread_t tid[3];
+    pthread_attr_t attr[3];
 
     progname = "test";
 
@@ -529,24 +537,25 @@ int main(int argc, char *argv[])
         { "pwd", 0, 0, 'p' },
         { 0, 0, 0, 0 }
     };
-    
+
+    signal(SIGINT, signal_handler);
     lwqq_log_set_level(4);
     lc = lwqq_client_new(qqnumber, password);
     lc->action = &act;
     if (!lc) {
-        lwqq_log(LOG_NOTICE, "Create lwqq client failed\n");
+/*        lwqq_log(LOG_NOTICE, "Create lwqq client failed\n");*/
         return -1;
     }
 
     /* Login to server */
     err = cli_login();
     if (err != LWQQ_EC_OK) {
-        lwqq_log(LOG_ERROR, "Login error, exit\n");
+/*        lwqq_log(LOG_ERROR, "Login error, exit\n");*/
         lwqq_client_free(lc);
         return -1;
     }
 
-    lwqq_log(LOG_NOTICE, "Login successfully\n");
+/*    lwqq_log(LOG_NOTICE, "Login successfully\n");*/
     LwqqAsyncEvset* set = lwqq_async_evset_new();
     LwqqAsyncEvent* ev;
     ev = lwqq_info_get_discu_name_list(lc);
@@ -556,7 +565,7 @@ int main(int argc, char *argv[])
     lwqq_async_evset_add_event(set,ev);
 
     /* Initialize thread */
-    for (i = 0; i < 2; ++i) {
+    for (i = 0; i < 3; ++i) {
         pthread_attr_init(&attr[i]);
         pthread_attr_setdetachstate(&attr[i], PTHREAD_CREATE_DETACHED);
     }
@@ -567,9 +576,15 @@ int main(int argc, char *argv[])
     /* Create a thread to update friend info */
     pthread_create(&tid[1], &attr[1], info_thread, lc);
 
+    /* create a thread to get pulled message from robot */
+    pthread_create(&tid[2], &attr[2], handle_pull_msg, NULL);
+
+
     /* Enter command loop  */
-    command_loop();
-    
+    zloop_t* zloop;
+    zloop = zloop_new();
+    zloop_start(zloop);
+
     /* Logout */
     cli_logout(lc);
     lwqq_client_free(lc);
