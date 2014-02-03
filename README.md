@@ -1,21 +1,22 @@
-ITM-ChatOps-Robot
+TomBot
 =================
+A chat robot written in Python
 
-设计初衷
+基础设施支持多种聊天工具的结合，只需写adapter
+与Hubot不同的是一个服务端可以同时有多个聊天软件结合
+虽然是用python写的，但是性能仍然很好
+
+用到的技术
 =================
-- 所有实现，都以多机执行为基础
-- 收集OS信息，提供服务器健康情况
-- 收集oracle, weblogic, app的日志，集中展示
-- 执行自动化脚本，脚本以插件形式加入
-- 使用REST风格的api调用来连接前后台
+用zeromq来支持进程间通信和程序内通信(SUB/PUB, PULL/PUSH)
+受益于zeromq，adapter与服务端主程序的通信是实时且异步的
+用gevent支持异步并发
 
-设计理念
-================
-1. 简单：界面简洁、实现简洁
-2. 快速：做到基本不影响受控主机的性能（5%CPU以下）
-3. 丰富：提供丰富的基础信息，以供后续分析
-4. 好玩：可以调戏：）
-
-借鉴的项目
+Adapter
 =================
-hubot
+adapter用zeromq实现通信,事实上adapter的编写很简单，
+因为zeromq支持40+种语言，所以语言不受限制，adapter只要开启两个后台线程，
+一个通过Publish/Subscribe模式发送消息到服务端，另一个线程用PULL/PUSH模式接收服务端消息，
+并进行处理。
+
+Inspired by Hubot!
