@@ -1,8 +1,10 @@
 #coding: utf-8
 import logging
+from abc import abstractmethod
 
 import zmq.green as zmq
 import gevent
+import threading
 
 import re
 
@@ -12,6 +14,7 @@ push.bind('ipc:///tmp/push.ipc')
 
 logger = logging.getLogger('')
 def regex(arg):
+    arg = arg.encode('utf-8')
     regexp = re.compile(arg, re.I)
     def _regex(func):
         def __regex(*args, **kwargs):
@@ -31,11 +34,13 @@ class Message(object):
         push.send_multipart([content, self.id, self.type])
         logging.info('push message to adapter: %s', (content, self.id, self.type))
 
-class Engine(object):
+class Engine(threading.Thread):
     def __init__(self):
+        super(Engine, self).__init__()
+        self.setDaemon(True)
         self._http_client = None
         self.subscriber = context.socket(zmq.SUB)
-        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
+#        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
         self.subscriber.connect('ipc:///tmp/route.ipc')
         self.data = None
 
@@ -44,7 +49,8 @@ class Engine(object):
         msg.send(message)
 
     # TODO 是否增加超时机制
-    @regex('.*')
+    @abstractmethod
+#    @regex('.*')
     def respond(self, message, matches):
         pass
 
@@ -53,14 +59,22 @@ class Engine(object):
 
     def _recv(self):
         while True:
-            [content, id, type] = self.subscriber.recv_multipart()
-            logger.info('received data from forwarder: %s', (content, id, type))
-            # response 可能是一个耗时的任务，因此单独spawn出来去执行
-            gevent.spawn(self.respond, Message((content, id, type)))
+            try:
+                [content, id, type] = self.subscriber.recv_multipart(zmq.NOBLOCK)
+                logger.info('received data from forwarder: %s', (content, id, type))
+                self.respond(Message((content, id, type)))
+            except zmq.ZMQError as e:
+                if e.errno == zmq.EAGAIN:
+                    gevent.sleep(0.1)
+            gevent.sleep(0.1)
 
     def run(self):
-        gevent.spawn(self._recv)
-#        self._recv()
+#        gevent.spawn(self._recv)
+#        gevent.sleep(0)
+        try:
+            self._recv()
+        except KeyboardInterrupt:
+            exit(0)
 
     def poweroff(self):
         pass
@@ -69,3 +83,6 @@ class Engine(object):
         if not self._http_client:
             self._http_client = AsyncHTTPClient()
         self._http_client.fetch(url, callback=callback)
+
+    def gbk2utf8(self, string):
+        return string.decode('GBK').encode('UTF-8')

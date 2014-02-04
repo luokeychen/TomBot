@@ -44,25 +44,6 @@ static LwqqClient *lc = NULL;
 static char *progname;
 
 #ifdef WIN32
-char *strtok_r(char *str, const char *delim, char **save)
-{
-    char *res, *last;
-
-    if( !save )
-        return strtok(str, delim);
-    if( !str && !(str = *save) )
-        return NULL;
-    last = str + strlen(str);
-    if( (*save = res = strtok(str, delim)) )
-    {
-        *save += strlen(res);
-        if( *save < last )
-            (*save)++;
-        else
-            *save = NULL;
-    }
-    return res;
-}
 const char* iconv(unsigned int from,unsigned int to,const char* str,size_t sz)
 {
 	static char buf[2048];
@@ -101,9 +82,9 @@ static int send_message(int type, const char* to, const char *data)
 
     TAILQ_INSERT_TAIL(&mmsg->content,c,entries);
 
-    LWQQ_SYNC_BEGIN(lc);
+/*    LWQQ_SYNC_BEGIN(lc);*/
     lwqq_msg_send(lc,mmsg);
-    LWQQ_SYNC_END(lc);
+/*    LWQQ_SYNC_END(lc);*/
 
     mmsg->f_name = NULL;
 
@@ -153,12 +134,8 @@ void signal_handler(int signum)
 
 
 //TODO 增加图片支持
-static void* handle_pull_msg()
+static void* handle_pull_msg(void* socket)
 {
-    zctx_t *ctx = zctx_new();
-    void *pull = zsocket_new(ctx, ZMQ_PULL);
-    zsocket_connect(pull, "ipc:///tmp/push.ipc");
-    zclock_sleep(200);
     zmsg_t *msg = zmsg_new();
     zframe_t *frame = zframe_new(NULL, -1);
 
@@ -170,7 +147,7 @@ static void* handle_pull_msg()
 
     while(1)
     {
-        msg = zmsg_recv(pull);
+        msg = zmsg_recv(socket);
         frame = zmsg_first(msg);
         content = zframe_strdup(frame);
         frame = zmsg_next(msg);
@@ -194,6 +171,7 @@ static void* handle_pull_msg()
         free(id);
         free(type);
     }
+
 
     pthread_exit(NULL);
     return NULL;
@@ -254,24 +232,19 @@ static int list_f()
     return 0;
 }
 
-static void handle_new_msg(LwqqRecvMsg *recvmsg)
+static void handle_new_msg(LwqqRecvMsg *recvmsg, void* socket)
 {
     LwqqMsg *msg = recvmsg->msg;
     char buf[2048] = {0};
-    zctx_t *ctx = zctx_new();
-    void *pub = zsocket_new(ctx, ZMQ_PUB);
-    zsocket_connect(pub, "ipc:///tmp/publish.ipc");
-    //give zmq time to flush
-    zclock_sleep(200);
     zmsg_t *z_msg;
-    assert(msg);
+/*    assert(msg);*/
+    LwqqMsgContent *c;
+    LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
 
 
     printf("Receive message type: %d\n", msg->type);
     if (msg->type == LWQQ_MS_BUDDY_MSG) {
 
-        LwqqMsgContent *c;
-        LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
         TAILQ_FOREACH(c, &mmsg->content, entries) {
             if (c->type == LWQQ_CONTENT_STRING) {
                 strcat(buf, c->data.str);
@@ -288,12 +261,12 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
         char msg_type[5];
         sprintf(msg_type, "%d", LWQQ_MS_BUDDY_MSG);
         zmsg_addmem(z_msg, msg_type, strlen(msg_type));
-        zmsg_send(&z_msg, pub);
+/*        free(uin);*/
+/*        free(buf);*/
+        zmsg_send(&z_msg, socket);
+        zmsg_destroy(&z_msg);
 
     } else if (msg->type == LWQQ_MS_GROUP_MSG) {
-        LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
-
-        LwqqMsgContent *c;
         TAILQ_FOREACH(c, &mmsg->content, entries) {
             if (c->type == LWQQ_CONTENT_STRING) {
                 strcat(buf, c->data.str);
@@ -312,14 +285,13 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
                 char msg_type[5];
                 sprintf(msg_type, "%d", LWQQ_MS_GROUP_MSG);
                 zmsg_addmem(z_msg, msg_type, strlen(msg_type));
-                zmsg_send(&z_msg, pub);
+                zmsg_send(&z_msg, socket);
                 break;
             }
         }
+        zmsg_destroy(&z_msg);
+/*        lwqq_group_free(group);*/
     } else if (msg->type == LWQQ_MS_DISCU_MSG) {
-        LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
-
-        LwqqMsgContent *c;
         TAILQ_FOREACH(c, &mmsg->content, entries) {
             if (c->type == LWQQ_CONTENT_STRING) {
                 strcat(buf, c->data.str);
@@ -335,7 +307,8 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
         char msg_type[5];
         sprintf(msg_type, "%d", LWQQ_MS_DISCU_MSG);
         zmsg_addmem(z_msg, msg_type, strlen(msg_type));
-        zmsg_send(&z_msg, pub);
+        zmsg_send(&z_msg, socket);
+        zmsg_destroy(&z_msg);
     } else if (msg->type == LWQQ_MT_STATUS_CHANGE) {
         LwqqMsgStatusChange *status = (LwqqMsgStatusChange*)msg;
         printf("Receive status change: %s - > %s\n",
@@ -345,6 +318,7 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
         printf("unknow message\n");
     }
 
+/*    free(buf);*/
     lwqq_msg_free(recvmsg->msg);
     zmsg_destroy(&z_msg);
     s_free(recvmsg);
@@ -356,6 +330,12 @@ static void *recvmsg_thread(void *list)
 
     /* Poll to receive message */
     lwqq_msglist_poll(l, 0);
+
+    zctx_t *ctx = zctx_new();
+    void *pub = zsocket_new(ctx, ZMQ_PUB);
+    zsocket_connect(pub, "ipc:///tmp/publish.ipc");
+    //give zmq time to flush
+    zclock_sleep(200);
 
     /* Need to wrap those code so look like more nice */
     while (1) {
@@ -370,11 +350,13 @@ static void *recvmsg_thread(void *list)
         recvmsg = TAILQ_FIRST(&l->head);
         TAILQ_REMOVE(&l->head,recvmsg, entries);
         pthread_mutex_unlock(&l->mutex);
-        handle_new_msg(recvmsg);
+        handle_new_msg(recvmsg, pub);
 
 	fflush(stdout);
     }
 
+    zsocket_destroy(ctx, pub);
+    zctx_destroy(&ctx);
     pthread_exit(NULL);
     return NULL;
 }
@@ -430,8 +412,6 @@ int main()
     char *qqnumber = "1744611347", *password = "jay19880821";
     LwqqErrorCode err;
     int i, c, e = 0;
-    pthread_t tid[3];
-    pthread_attr_t attr[3];
 
     progname = "test";
 
@@ -469,6 +449,11 @@ int main()
     ev = lwqq_info_get_group_name_list(lc, error);
     lwqq_async_evset_add_event(set,ev);
 
+    ev = lwqq_info_get_friends_info(lc,NULL,err);
+    lwqq_async_evset_add_event(set,ev);
+
+    pthread_t tid[3];
+    pthread_attr_t attr[3];
     /* Initialize thread */
     for (i = 0; i < 3; ++i) {
         pthread_attr_init(&attr[i]);
@@ -479,10 +464,16 @@ int main()
     pthread_create(&tid[0], &attr[0], recvmsg_thread, lc->msg_list);
 
     /* Create a thread to update friend info */
-    pthread_create(&tid[1], &attr[1], info_thread, lc);
+/*    pthread_create(&tid[1], &attr[1], info_thread, lc);*/
 
     /* create a thread to get pulled message from robot */
-    pthread_create(&tid[2], &attr[2], handle_pull_msg, NULL);
+
+    zctx_t *ctx = zctx_new();
+    void *pull = zsocket_new(ctx, ZMQ_PULL);
+    zsocket_connect(pull, "ipc:///tmp/push.ipc");
+    zclock_sleep(200);
+
+    pthread_create(&tid[2], &attr[2], handle_pull_msg, pull);
     sleep(3);
     list_f();
 
@@ -492,6 +483,8 @@ int main()
     zloop = zloop_new();
     zloop_start(zloop);
 
+    zsocket_destroy(ctx, pull);
+    zctx_destroy(&ctx);
     /* Logout */
     cli_logout(lc);
     lwqq_client_free(lc);

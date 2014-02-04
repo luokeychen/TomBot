@@ -13,7 +13,7 @@ from engine import regex
 
 class Caculator(Engine):
     '''Tom calc 表达式. 例如：tom calc 123^22/444+123.
-            ps. 可以做位运算：tom calc 1<<3|2<<8&11|~123'''
+            ps. 可以做位运算：tom calc 1<<3|&11|~123'''
     def __init__(self):
         super(Caculator, self).__init__()
         self.add_topic('calc')
@@ -24,9 +24,9 @@ class Caculator(Engine):
         try:
             result = self.calculate(expression)
             message.send(result)
-        except OverflowError:
+        except OverflowError as e:
             message.send('数字太大了，我算不出来！')
-        except SyntaxError:
+        except SyntaxError as e:
             message.send('这种格式汤姆不能理解！')
 
     def calculate(self, exp):
@@ -48,18 +48,3 @@ class Caculator(Engine):
         if len(str(res)) > 100:
             res = '%E' % float(res)
         return str(res)
-
-
-
-def test():
-    import tornado.log
-    import tornado.ioloop
-    app = tornado.web.Application([
-            (r'/calc', Caculator)
-            ], debug=True)
-    tornado.log.enable_pretty_logging()
-    app.listen(3000)
-    tornado.ioloop.IOLoop.instance().start()
-
-if __name__ == '__main__':
-    test()

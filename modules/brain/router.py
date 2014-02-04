@@ -13,6 +13,8 @@ import sys
 
 import zmq.green as zmq
 import gevent
+from gevent import monkey
+monkey.patch_all(thread=False)
 import json
 
 from engine import Engine
@@ -38,7 +40,7 @@ def load_scripts(scripts):
         script_class = getattr(m, class_name)
         logger.info('Loading script: %s', class_name)
         _instance = script_class()
-        _instance.run()
+        gevent.spawn(_instance.start)
 
 
 def forwarding():
@@ -60,11 +62,17 @@ def forwarding():
     # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
     pattern = re.compile('^' + name, flags=re.IGNORECASE)
     while True:
-        [_content, _id, _type] = frontend.recv_multipart()
-        logging.info('received message from adapter : %s', (_content, _id, _type))
-        _content = pattern.sub('', _content, 1).strip()
-        backend.send_multipart([_content, _id, _type])
-        logging.info('publish message to scripts: %s', (_content, _id, _type))
+        try:
+            [_content, _id, _type] = frontend.recv_multipart(zmq.NOBLOCK)
+            logging.info('received message from adapter : %s', (_content, _id, _type))
+            _content = pattern.sub('', _content, 1).strip()
+            backend.send_multipart([_content, _id, _type])
+            logging.info('publish message to scripts: %s', (_content, _id, _type))
+        except zmq.ZMQError as e:
+            if e.errno == zmq.EAGAIN:
+                gevent.sleep(0)
+            else:
+                raise
 
 def run():
     scripts = get_scripts()
