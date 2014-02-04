@@ -179,14 +179,12 @@ static void* handle_pull_msg()
         type = zframe_strdup(frame);
         printf("receive message from engine: %s, %s, %s\n", content, id, type);
         i_type = atoi(type);
-        printf("i_type: %d\n", i_type);
         i_id = atoi(id);
         if (i_type == LWQQ_MS_BUDDY_MSG) {
             send_message(LWQQ_MS_BUDDY_MSG, id, content);
         } else if (i_type == LWQQ_MS_DISCU_MSG)
             send_message(LWQQ_MS_DISCU_MSG, id, content);
         else if (i_type == LWQQ_MS_GROUP_MSG) {
-            lwqq_msg_send_simple(lc, LWQQ_MS_GROUP_MSG, id, content);
             send_message(LWQQ_MS_GROUP_MSG, id, content);
         }
         else
@@ -205,6 +203,7 @@ static void* handle_pull_msg()
 static int list_f()
 {
     char buf[1024] = {0};
+    printf("-------------------buddy group discu-------------------------\n");
 
     /* List all buddies */
     LwqqBuddy *buddy;
@@ -262,8 +261,9 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
     zctx_t *ctx = zctx_new();
     void *pub = zsocket_new(ctx, ZMQ_PUB);
     zsocket_connect(pub, "ipc:///tmp/publish.ipc");
+    //give zmq time to flush
     zclock_sleep(200);
-    zmsg_t *z_msg = zmsg_new();
+    zmsg_t *z_msg;
     assert(msg);
 
 
@@ -281,6 +281,7 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
         }
         printf("Receive message: %s\n", charset(buf));
 
+        z_msg = zmsg_new();
         zmsg_addmem(z_msg, buf, strlen(buf));
         char* uin = mmsg->buddy.from->uin;
         zmsg_addmem(z_msg, uin, strlen(uin));
@@ -303,12 +304,18 @@ static void handle_new_msg(LwqqRecvMsg *recvmsg)
         printf("Receive message: %s\n", charset(buf));
         z_msg = zmsg_new();
         zmsg_addmem(z_msg, buf, strlen(buf));
-        char* group_code = mmsg->group.group_code;
-        zmsg_addmem(z_msg, group_code, strlen(group_code));
-        char msg_type[5];
-        sprintf(msg_type, "%d", LWQQ_MS_GROUP_MSG);
-        zmsg_addmem(z_msg, msg_type, strlen(msg_type));
-        zmsg_send(&z_msg, pub);
+
+        LwqqGroup *group;
+        LIST_FOREACH(group, &lc->groups, entries) {
+            if (!strcmp(mmsg->group.group_code ,group->code)) {
+                zmsg_addmem(z_msg, group->gid, strlen(group->gid));
+                char msg_type[5];
+                sprintf(msg_type, "%d", LWQQ_MS_GROUP_MSG);
+                zmsg_addmem(z_msg, msg_type, strlen(msg_type));
+                zmsg_send(&z_msg, pub);
+                break;
+            }
+        }
     } else if (msg->type == LWQQ_MS_DISCU_MSG) {
         LwqqMsgMessage *mmsg = (LwqqMsgMessage*)msg;
 
@@ -476,6 +483,7 @@ int main()
 
     /* create a thread to get pulled message from robot */
     pthread_create(&tid[2], &attr[2], handle_pull_msg, NULL);
+    sleep(3);
     list_f();
 
 
