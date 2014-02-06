@@ -85,6 +85,7 @@ def run():
     load_scripts(scripts)
     logger.info('脚本载入完成')
     logger.info('主程序开始监听')
+    # forwarding 必须在子进程中运行，否则ioloop会有问题
     p = Process(target=forwarding)
     p.start()
     p.join()

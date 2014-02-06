@@ -12,7 +12,7 @@ A chat robot written in Python
 =================
 用zeromq来支持进程间通信和程序内通信(SUB/PUB, PULL/PUSH),受益于zeromq，adapter与服务端主程序的通信是实时且异步的
 
-用gevent支持异步并发
+用tornado支持异步并发(会考虑换成gevent)
 
 Adapter
 =================
