@@ -1,8 +1,8 @@
 #coding: utf-8
 from engine import Engine
-from engine import regex
+from utils import run_in_thread, gbk2utf8
+from engine import respond_handler
 import cx_Oracle
-import threading
 # 解决返回值为?的问题
 #import sys
 #reload(sys)
@@ -15,13 +15,13 @@ class Flow(Engine):
     def __init__(self):
         self.topics = ['query']
     
-    @regex('query flow (.+)$')
+    @respond_handler('query flow (.+)$')
     def respond(self, message, matches):
         key = matches.group(1)
         if self.check_contain_chinese(key):
-            Engine.run_in_thread(target=self.querydb, args=(None, '%'+key+'%', message))
+            run_in_thread(target=self.querydb, args=(None, '%'+key+'%', message))
         else:
-            Engine.run_in_thread(target=self.querydb, args=(key, '', message))
+            run_in_thread(target=self.querydb, args=(key, '', message))
 
     def querydb(self, serial, title, message):
         tns = cx_Oracle.makedsn('117.27.132.23', '21001', 'itmwiki')
@@ -60,7 +60,7 @@ class Flow(Engine):
         result = cs.fetchone()
         if result:
             url = url + str(result[0])
-            result = Engine.gbk2utf8(' '.join(result[1:]))
+            result = gbk2utf8(' '.join(result[1:]))
             result += '\n' + url
         else:
             result = 'Noting found.'

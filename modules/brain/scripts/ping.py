@@ -1,6 +1,6 @@
 #coding: utf-8
 from engine import Engine
-from engine import regex
+from engine import respond_handler
 import random
 
 class Ping(Engine):
@@ -19,6 +19,6 @@ class Ping(Engine):
                 '从我眼前走过的老鼠有很多只，但能停留在我心中的只有你这么一只！'
                 ]
     
-    @regex('\?$')
+    @respond_handler('\?$')
     def respond(self, message, matches):
         message.send(random.choice(self.greets))

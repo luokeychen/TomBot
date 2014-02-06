@@ -8,7 +8,7 @@ import re
 import zmq
 
 from engine import Engine
-from engine import regex
+from engine import respond_handler
 from utils import timeout, TimeoutException
 
 
@@ -17,7 +17,7 @@ class Caculator(Engine):
     def __init__(self):
         self.topics = ['calc']
 
-    @regex('calc (.*)$')
+    @respond_handler('calc (.*)$')
     def respond(self, message, matches):
         expression= matches.group(1)
         try:

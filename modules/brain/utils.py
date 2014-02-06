@@ -1,3 +1,4 @@
+import threading
 """
 Code to timeout with processes.
 
@@ -82,3 +83,11 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
+
+def run_in_thread(target=None, args=()):
+    t = threading.Thread(target=target, args=args)
+    t.daemon = True
+    t.start()
+
+def gbk2utf8(string):
+    return string.decode('GBK').encode('UTF-8')

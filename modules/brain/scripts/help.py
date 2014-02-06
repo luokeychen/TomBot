@@ -1,34 +1,30 @@
 #coding: utf-8
-import os
-import json
 import imp
+from inspect import isclass, getfile
 from engine import Engine
-from engine import regex
-
-_path = os.path.abspath(os.path.dirname(__file__))
+from engine import respond_handler
+from router import config
 
 class Help(Engine):
     '''Tom help \t[filter]'''
 
     def __init__(self):
         self.topics = ['help']
-        self.help_list = list()
+        self.helps = []
         self.get_helps()
 
     def get_helps(self):
-        fp = open(_path + '/../scripts.json')
-        scripts = json.load(fp).items()
-        fp.close()
 
-        for script in scripts:
-            class_name = script[0]
-            m = imp.load_source(script[0], _path + '/' + script[1])
-            script_class = getattr(m, class_name)
-            doc = script_class.__doc__
-            if doc:
-                self.help_list.append(script_class.__doc__)
+        # 载入对应文件的类
+        for plugin in config.plugins:
+            m = imp.load_source(plugin, '{0}/modules/brain/scripts/{1}.py'.format(config.home, plugin))
+            for item in dir(m):
+                attr = getattr(m, item)
+                if isclass(attr) and plugin in getfile(attr):
+                    if attr.__doc__:
+                        self.helps.append(attr.__doc__)
 
-    @regex('help (.*)$')
+    @respond_handler('help (.*)$')
     def respond(self, message, matches):
-        res = '\n'.join(self.help_list)
+        res = '\n'.join(self.helps)
         message.send(res)

@@ -1,6 +1,6 @@
 #coding: utf-8
 from engine import Engine
-from engine import regex
+from engine import respond_handler
 import random
 
 class Bye(Engine):
@@ -13,6 +13,6 @@ class Bye(Engine):
                 '晚安~'
                 ]
     
-    @regex('.*$')
+    @respond_handler('.*$')
     def respond(self, message, matches):
         message.send(random.choice(self.greets))

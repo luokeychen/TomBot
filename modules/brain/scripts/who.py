@@ -1,6 +1,6 @@
 # coding: utf-8
 from engine import Engine
-from engine import regex
+from engine import respond_handler
 import random
 
 class Who(Engine):
@@ -17,7 +17,7 @@ class Who(Engine):
                 '我还没想好怎么描述他'
                 ]
     
-    @regex('who is (\w+)$')
+    @respond_handler('who is (\w+)$')
     def respond(self, message, matches):
         if matches.group(1) == 'lily':
             message.send(random.choice(self.lily))

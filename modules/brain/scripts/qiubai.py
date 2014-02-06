@@ -11,7 +11,8 @@ import os
 import logging
 import random
 from engine import Engine
-from engine import regex
+from engine import respond_handler
+import utils
 
 from BeautifulSoup import BeautifulSoup          # For processing HTML
 
@@ -26,10 +27,10 @@ class Qiubai(Engine):
         self.topics = ['make']
         self.jokes = []
 
-    @regex('make me laugh$')
+    @respond_handler('make me laugh$')
     def respond(self, message, matches):
         # 如果文件为空则加载内容
-        Engine.run_in_thread(target=self.send, args=(message,))
+        utils.run_in_thread(target=self.send, args=(message,))
 
     def send(self, message):
         if not os.stat(qiushi).st_size or not len(self.jokes):

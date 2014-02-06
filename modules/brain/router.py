@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 
-from inspect import *
+from inspect import isclass, getfile
 
 import yaml
 import zmq
@@ -21,18 +21,18 @@ from multiprocessing import Process
 logger = logging.getLogger('')
 _path = os.path.abspath(os.path.dirname(__file__))
 
+import types
+sys.modules['config'] = types.ModuleType('config')
+import config
 
-class Config(object):
-    def __init__(self):
-        config_file = file('{0}/../../conf/config.yaml'.format(_path))
-        config = yaml.load(config_file)
-        self.name = config.get('name')
-        self.home = config.get('home')
-        self.ipc_path = config.get('ipc_path')
-        self.log_level = config.get('log_level')
-        self.plugins = config.get('plugins')
+config_file = file('{0}/../../conf/config.yaml'.format(_path))
+yaml_dict = yaml.load(config_file)
+config.name = yaml_dict.get('name')
+config.home = yaml_dict.get('home')
+config.ipc_path = yaml_dict.get('ipc_path')
+config.log_level = yaml_dict.get('log_level')
+config.plugins = yaml_dict.get('plugins')
 
-config = Config()
 
 def load_scripts():
 
@@ -54,7 +54,7 @@ def load_scripts():
 
 
 def forwarding():
-    name = 'Tom'
+    name = config.name
     context = zmq.Context(1)
     frontend = context.socket(zmq.SUB)
     frontend.setsockopt(zmq.IDENTITY, 'Frontend')

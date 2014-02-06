@@ -3,6 +3,8 @@ import logging
 import re
 from abc import abstractmethod
 
+import inspect
+
 import zmq
 from zmq.eventloop import ioloop
 from zmq.eventloop import zmqstream
@@ -11,20 +13,31 @@ import threading
 from router import config
 
 logger = logging.getLogger('')
-def regex(arg):
+
+
+def respond_handler(arg):
+    '''消息响应装饰器
+
+    '''
     arg = arg.encode('utf-8')
     regexp = re.compile(arg, re.I)
-    def _regex(func):
-        def __regex(*args, **kwargs):
+    def _handler(func):
+        def __handler(*args, **kwargs):
             matches = re.match(regexp, args[1].content)
-            return func(args[0], args[1], matches)
-        return __regex
-    return _regex
+            if matches:
+                return func(args[0], args[1], matches)
+            else:
+                return None
+        return __handler
+    return _handler
+
 
 class Message(object):
+    '''包装消息，方便保存上下文
+    
+    :param message: 消息tuple
+    '''
     def __init__(self, message, socket):
-        '''message is in json
-        '''
         self.msg = message
         self.content, self.id, self.type = message
         self.socket = socket
@@ -35,29 +48,43 @@ class Message(object):
 
 class Engine(object):
     '''
-    插件应继承此类，并重写respond方法'''
+    插件应继承此类
+
+    '''
 
     def __init__(self):
         self.topics = []
 
-    # TODO 是否增加超时机制
-    @abstractmethod
-#    @regex('.*')
-    def respond(self, message, matches):
-        pass
+    def setup_respond_handlers(self):
+
+        respond_handlers = []
+        for _, handler in inspect.getmembers(self, callable):
+            # 这里用装饰过的函数名来判断被装饰过的函数列表，所以自己定义的任何callable对象，不能命名为__handler
+            if handler.__name__ == '__handler':
+                if handler not in respond_handlers:
+                    respond_handlers.append(handler)
+            else:
+                continue
+
+        self.respond_handlers = respond_handlers
+        logger.debug('respond handlers: {0}'.format(self.respond_handlers))
 
     def _recv(self, msg):
+        '''接收消息
+        
+        '''
         try:
             [_content, _id, _type] = msg
-            logger.debug('received data from forwarder: {0}'.format((_content, _id, _type)))
-            self.respond(Message((_content, _id, _type), self.push))
+            logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
+            for handler in self.respond_handlers:
+                handler(Message((_content, _id, _type), self.push))
         except zmq.ZMQError as e:
             logger.error(e)
-        except Exception as e:
-            logger.error('异常了！！！')
-            logger.error(e)
+#        except Exception as e:
+#            logger.error(e)
 
     def run(self):
+        self.setup_respond_handlers()
         ioloop.install()
         # context 必须在run方法里创建
         # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
@@ -78,17 +105,4 @@ class Engine(object):
 #        loop.make_current()
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
         loop.start()
-
-    @staticmethod
-    def run_in_thread(target=None, args=()):
-        t = threading.Thread(target=target, args=args)
-        t.daemon = True
-        t.start()
-
-    def poweroff(self):
-        pass
-
-    @staticmethod
-    def gbk2utf8(string):
-        return string.decode('GBK').encode('UTF-8')
 
