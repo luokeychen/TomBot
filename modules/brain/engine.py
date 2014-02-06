@@ -1,5 +1,6 @@
 # coding: utf-8
 import logging
+import os
 from abc import abstractmethod
 
 import zmq
@@ -8,6 +9,11 @@ from zmq.eventloop import zmqstream
 import threading
 
 import re
+
+
+_home = os.getenv('TOMBOT_HOME')
+_push_ipc_file = 'ipc://{0}/run/push.ipc'.format(_home)
+_route_ipc_file = 'ipc://{0}/run/route.ipc'.format(_home)
 
 logger = logging.getLogger('')
 def regex(arg):
@@ -30,9 +36,11 @@ class Message(object):
 
     def send(self, content):
         self.socket.send_multipart([content, self.id, self.type])
-        logging.debug('push message to adapter: %s', (content, self.id, self.type))
+        logging.debug('push message to adapter: {0}'.format((content, self.id, self.type)))
 
 class Engine(object):
+    '''
+    插件应继承此类，并重写respond方法'''
 
     def __init__(self):
         self.topics = []
@@ -46,7 +54,7 @@ class Engine(object):
     def _recv(self, msg):
         try:
             [_content, _id, _type] = msg
-            logger.debug('received data from forwarder: %s', (_content, _id, _type))
+            logger.debug('received data from forwarder: {0}'.format((_content, _id, _type)))
             self.respond(Message((_content, _id, _type), self.push))
         except zmq.ZMQError as e:
             logger.error(e)
@@ -60,11 +68,11 @@ class Engine(object):
         # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
         context = zmq.Context()
         self.push = context.socket(zmq.PUSH)
-        self.push.connect('ipc:///tmp/push.ipc')
+        self.push.connect(_push_ipc_file)
 
         subscriber = context.socket(zmq.SUB)
 #        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
-        subscriber.connect('ipc:///tmp/route.ipc')
+        subscriber.connect(_route_ipc_file)
         stream = zmqstream.ZMQStream(subscriber)
         stream.on_recv(self._recv)
 
