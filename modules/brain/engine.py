@@ -1,16 +1,13 @@
-#coding: utf-8
+# coding: utf-8
 import logging
 from abc import abstractmethod
 
-import zmq.green as zmq
-import gevent
+import zmq
+from zmq.eventloop import ioloop
+from zmq.eventloop import zmqstream
 import threading
 
 import re
-
-context = zmq.Context.instance()
-push = context.socket(zmq.PUSH)
-push.bind('ipc:///tmp/push.ipc')
 
 logger = logging.getLogger('')
 def regex(arg):
@@ -24,29 +21,21 @@ def regex(arg):
     return _regex
 
 class Message(object):
-    def __init__(self, message):
+    def __init__(self, message, socket):
         '''message is in json
         '''
         self.msg = message
         self.content, self.id, self.type = message
+        self.socket = socket
 
     def send(self, content):
-        push.send_multipart([content, self.id, self.type])
-        logging.info('push message to adapter: %s', (content, self.id, self.type))
+        self.socket.send_multipart([content, self.id, self.type])
+        logging.debug('push message to adapter: %s', (content, self.id, self.type))
 
-class Engine(threading.Thread):
+class Engine(object):
+
     def __init__(self):
-        super(Engine, self).__init__()
-        self.setDaemon(True)
-        self._http_client = None
-        self.subscriber = context.socket(zmq.SUB)
-#        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
-        self.subscriber.connect('ipc:///tmp/route.ipc')
-        self.data = None
-
-    def send(self, message):
-        msg = Message(message)
-        msg.send(message)
+        self.topics = []
 
     # TODO 是否增加超时机制
     @abstractmethod
@@ -54,35 +43,49 @@ class Engine(threading.Thread):
     def respond(self, message, matches):
         pass
 
-    def add_topic(self, topic):
-        self.subscriber.setsockopt(zmq.SUBSCRIBE, topic)
-
-    def _recv(self):
-        while True:
-            try:
-                [content, id, type] = self.subscriber.recv_multipart(zmq.NOBLOCK)
-                logger.info('received data from forwarder: %s', (content, id, type))
-                self.respond(Message((content, id, type)))
-            except zmq.ZMQError as e:
-                if e.errno == zmq.EAGAIN:
-                    gevent.sleep(0.1)
-            gevent.sleep(0.1)
+    def _recv(self, msg):
+        try:
+            [_content, _id, _type] = msg
+            logger.debug('received data from forwarder: %s', (_content, _id, _type))
+            self.respond(Message((_content, _id, _type), self.push))
+        except zmq.ZMQError as e:
+            logger.error(e)
+        except Exception as e:
+            logger.error('异常了！！！')
+            logger.error(e)
 
     def run(self):
-#        gevent.spawn(self._recv)
-#        gevent.sleep(0)
-        try:
-            self._recv()
-        except KeyboardInterrupt:
-            exit(0)
+        ioloop.install()
+        # context 必须在run方法里创建
+        # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
+        context = zmq.Context()
+        self.push = context.socket(zmq.PUSH)
+        self.push.connect('ipc:///tmp/push.ipc')
+
+        subscriber = context.socket(zmq.SUB)
+#        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
+        subscriber.connect('ipc:///tmp/route.ipc')
+        stream = zmqstream.ZMQStream(subscriber)
+        stream.on_recv(self._recv)
+
+        for topic in self.topics:
+            subscriber.setsockopt(zmq.SUBSCRIBE, topic)
+
+        loop = ioloop.IOLoop.instance()
+#        loop.make_current()
+        logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
+        loop.start()
+
+    @staticmethod
+    def run_in_thread(target=None, args=()):
+        t = threading.Thread(target=target, args=args)
+        t.daemon = True
+        t.start()
 
     def poweroff(self):
         pass
 
-    def http(url, callback=None):
-        if not self._http_client:
-            self._http_client = AsyncHTTPClient()
-        self._http_client.fetch(url, callback=callback)
-
-    def gbk2utf8(self, string):
+    @staticmethod
+    def gbk2utf8(string):
         return string.decode('GBK').encode('UTF-8')
+

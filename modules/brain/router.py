@@ -1,8 +1,6 @@
-#coding: utf-8
+# coding: utf-8
 from __future__ import division
 from __future__ import print_function
-#from __future__ import unicode_literals
-from __future__ import absolute_import
 
 
 import re
@@ -11,14 +9,14 @@ import logging
 import os
 import sys
 
-import zmq.green as zmq
-import gevent
-from gevent import monkey
-monkey.patch_all(thread=False)
+import zmq
+from zmq.eventloop import ioloop
+ioloop.install()
+from zmq.eventloop import zmqstream
 import json
+from multiprocessing import Process
 
 from engine import Engine
-
 
 logger = logging.getLogger('')
 _path = os.path.abspath(os.path.dirname(__file__))
@@ -38,14 +36,15 @@ def load_scripts(scripts):
         m = imp.load_source(script[0], _path + '/scripts/' + script[1])
 
         script_class = getattr(m, class_name)
-        logger.info('Loading script: %s', class_name)
+        logger.info('正在载入脚本{0}'.format(class_name))
         _instance = script_class()
-        gevent.spawn(_instance.start)
+        p = Process(target=_instance.run)
+        p.start()
 
 
 def forwarding():
     name = 'Tom'
-    context = zmq.Context.instance()
+    context = zmq.Context(1)
     frontend = context.socket(zmq.SUB)
     frontend.setsockopt(zmq.IDENTITY, 'Frontend')
     # 订阅以机器人名字开头的消息，包括小写、大写、首字母大写
@@ -61,28 +60,34 @@ def forwarding():
     backend.bind('ipc:///tmp/route.ipc')
     # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
     pattern = re.compile('^' + name, flags=re.IGNORECASE)
-    while True:
-        try:
-            [_content, _id, _type] = frontend.recv_multipart(zmq.NOBLOCK)
-            logging.info('received message from adapter : %s', (_content, _id, _type))
-            _content = pattern.sub('', _content, 1).strip()
-            backend.send_multipart([_content, _id, _type])
-            logging.info('publish message to scripts: %s', (_content, _id, _type))
-        except zmq.ZMQError as e:
-            if e.errno == zmq.EAGAIN:
-                gevent.sleep(0)
-            else:
-                raise
+
+    def _recv(msg):
+        [_content, _id, _type] = msg
+        logging.debug('received message from adapter : %s', (_content, _id, _type))
+        _content = pattern.sub('', _content, 1).strip()
+        backend.send_multipart([_content, _id, _type])
+        logging.debug('publish message to scripts: %s', (_content, _id, _type))
+        
+    stream = zmqstream.ZMQStream(frontend)
+    stream.on_recv(_recv)
+    loop = ioloop.IOLoop.instance()
+#    loop.make_current()
+    loop.start()
+
 
 def run():
+    import tornado.log
+    tornado.log.enable_pretty_logging()
+    logger = logging.getLogger('')
+    logger.setLevel(logging.DEBUG)
+    logger.info('开始载入脚本...')
     scripts = get_scripts()
     load_scripts(scripts)
-    strm_out = logging.StreamHandler(sys.__stdout__)
-    formatter = logging.Formatter('%(asctime)s %(levelname)s %(filename)s %(message)s')
-    strm_out.setFormatter(formatter)
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(strm_out)
-    gevent.spawn(forwarding).join()
+    logger.info('脚本载入完成')
+    logger.info('主程序开始监听')
+    p = Process(target=forwarding)
+    p.start()
+    p.join()
 
 if __name__ == '__main__':
     run()

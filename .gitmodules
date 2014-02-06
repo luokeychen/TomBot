@@ -1,3 +1,3 @@
-[submodule "lwqq"]
-    path = modules/adapters/qq/lwqq
-    url = https://github.com/xiehuc/lwqq.git
+[submodule "twqq"]
+    path = modules/adapters/qq/twqq
+    url = git@github.com:jayklx/twqq.git

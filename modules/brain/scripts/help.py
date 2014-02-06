@@ -8,11 +8,10 @@ from engine import regex
 _path = os.path.abspath(os.path.dirname(__file__))
 
 class Help(Engine):
-    '''Tom help [filter]'''
+    '''Tom help \t[filter]'''
 
     def __init__(self):
-        super(Help, self).__init__()
-        self.add_topic('help')
+        self.topics = ['help']
         self.help_list = list()
         self.get_helps()
 
@@ -25,7 +24,9 @@ class Help(Engine):
             class_name = script[0]
             m = imp.load_source(script[0], _path + '/' + script[1])
             script_class = getattr(m, class_name)
-            self.help_list.append(script_class.__doc__)
+            doc = script_class.__doc__
+            if doc:
+                self.help_list.append(script_class.__doc__)
 
     @regex('help (.*)$')
     def respond(self, message, matches):

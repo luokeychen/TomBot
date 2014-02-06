@@ -1,4 +1,4 @@
-#coding: utf-8
+# coding: utf-8
 #操作redis，存储数据
 class Brain(object):
     def __init__(self):
