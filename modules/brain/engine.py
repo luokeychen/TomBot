@@ -1,6 +1,6 @@
 # coding: utf-8
 import logging
-import os
+import re
 from abc import abstractmethod
 
 import zmq
@@ -8,12 +8,7 @@ from zmq.eventloop import ioloop
 from zmq.eventloop import zmqstream
 import threading
 
-import re
-
-
-_home = os.getenv('TOMBOT_HOME')
-_push_ipc_file = 'ipc://{0}/run/push.ipc'.format(_home)
-_route_ipc_file = 'ipc://{0}/run/route.ipc'.format(_home)
+from router import config
 
 logger = logging.getLogger('')
 def regex(arg):
@@ -36,7 +31,7 @@ class Message(object):
 
     def send(self, content):
         self.socket.send_multipart([content, self.id, self.type])
-        logging.debug('push message to adapter: {0}'.format((content, self.id, self.type)))
+        logging.debug('推送消息到adapter: {0}'.format((content, self.id, self.type)))
 
 class Engine(object):
     '''
@@ -68,11 +63,11 @@ class Engine(object):
         # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
         context = zmq.Context()
         self.push = context.socket(zmq.PUSH)
-        self.push.connect(_push_ipc_file)
+        self.push.connect('ipc://{0}/push.ipc'.format(config.ipc_path))
 
         subscriber = context.socket(zmq.SUB)
 #        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
-        subscriber.connect(_route_ipc_file)
+        subscriber.connect('ipc://{0}/route.ipc'.format(config.ipc_path))
         stream = zmqstream.ZMQStream(subscriber)
         stream.on_recv(self._recv)
 

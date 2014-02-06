@@ -15,6 +15,7 @@ import zmq
 from zmq.eventloop import zmqstream, ioloop
 
 import sys
+import os
 sys.path.append('./twqq')
 from twqq.client import WebQQClient
 from twqq.requests import system_message_handler, group_message_handler, discu_message_handler
@@ -27,9 +28,10 @@ ioloop.install()
 
 context = zmq.Context(1)
 pub = context.socket(zmq.PUB)
-pub.connect('ipc:///tmp/publish.ipc')
+_home = os.getenv('TOMBOT_HOME')
+pub.connect('ipc://{0}/run/publish.ipc'.format(_home))
 pull = context.socket(zmq.PULL)
-pull.bind('ipc:///tmp/push.ipc')
+pull.bind('ipc://{0}/run/push.ipc'.format(_home))
 
 
 class Client(WebQQClient):

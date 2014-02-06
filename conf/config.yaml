@@ -1,9 +1,17 @@
-name = 'Tom'
+name: Tom
+home: /home/konglx/project/TomBot
+log_level: debug
+adapter: qq
+ipc_path: /home/konglx/project/TomBot/run
 
-http_port = 3333
-log.level = 'debug'
+redis_server : 127.0.0.1
+redis_port : 9673
 
-adapter = 'qq'
-
-redis_server = '127.0.0.1'
-redis_port = 9673
+plugins:
+    - calc
+    - ping
+    - help
+    - flow
+    - qiubai
+    - who
+    - bye

@@ -8,10 +8,10 @@ class Who(Engine):
         self.topics = ['who']
         self.lily = [
                 '她是个腐女',
-                '别跟我提她！！！',
+                '别跟我提她！！！'
                 ]
         self.lzz = [
-                '卖萌可耻！'
+                '一个很二很二的人。。。'
                 ]
         self.agan = [
                 '我还没想好怎么描述他'
@@ -19,7 +19,7 @@ class Who(Engine):
     
     @regex('who is (\w+)$')
     def respond(self, message, matches):
-        if mathes.group(1) == 'lily':
+        if matches.group(1) == 'lily':
             message.send(random.choice(self.lily))
-        if mathes.group(1) == 'lzz':
+        if matches.group(1) == 'lzz':
             message.send(random.choice(self.lzz))

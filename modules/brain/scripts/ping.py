@@ -6,8 +6,7 @@ import random
 class Ping(Engine):
     '''Tom? 将得到随机应答，用来确认Tom是否在工作'''
     def __init__(self):
-        self.topics = ['?']
-        self.topics = ['？']
+        self.topics = ['?', '？']
         self.greets = [
                 '在，主人！',
                 '是的！主人！',
