@@ -29,3 +29,7 @@ Plugin
 详见scripts目录下的template.py
 
 Inspired by Hubot!
+
+配置
+===============
+配置用yaml格式（其好处是可读性极强，且可以直接转换为python对象，使用方便
