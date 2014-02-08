@@ -25,6 +25,6 @@ Plugin
 可以编写插件拓展功能，自带几个插件：help.py calc.py ping.py
 编写插件
 ----------
-继承Engine, 类的docstring会被help.py读取并显示在help中，重写respond方法，用regex修饰器来匹配输入，正则被修饰器预处理，respond的matches参数可以使用matches.group(1)这样的方式获取括号中的匹配项
+继承Engine, 类的docstring会被help.py读取并显示在help中，被respond_handler修饰的方法会在收到消息时自动调用，并匹配正则，matches参数可以使用matches.group(1)这样的方式获取括号中的匹配项
 
 Inspired by Hubot!
