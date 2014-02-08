@@ -18,8 +18,8 @@ logger = logging.getLogger('')
 def respond_handler(arg):
     '''消息响应装饰器
 
+    :param arg: arg应是一个合法的正则表达式
     '''
-    arg = arg.encode('utf-8')
     regexp = re.compile(arg, re.I)
     def _handler(func):
         def __handler(*args, **kwargs):
@@ -53,6 +53,7 @@ class Engine(object):
     '''
 
     def __init__(self):
+        # 订阅列表中的字符串
         self.topics = []
 
     def setup_respond_handlers(self):
@@ -61,7 +62,7 @@ class Engine(object):
         '''
         respond_handlers = []
         for _, handler in inspect.getmembers(self, callable):
-            # 这里用装饰过的函数名来判断被装饰过的函数列表，所以自己定义的任何callable对象，不能命名为__handler, 这个方式比较难看，不过挺管用。。。
+            # FIXME 这里用装饰过的函数名来判断被装饰过的函数列表，所以自己定义的任何callable对象，不能命名为__handler
             if handler.__name__ == '__handler':
                 if handler not in respond_handlers:
                     respond_handlers.append(handler)
@@ -74,6 +75,7 @@ class Engine(object):
     def _recv(self, msg):
         '''接收消息
         
+        :param msg: 收到的消息，是个tuple
         '''
         try:
             [_content, _id, _type] = msg
@@ -82,8 +84,6 @@ class Engine(object):
                 handler(Message((_content, _id, _type), self.push))
         except zmq.ZMQError as e:
             logger.error(e)
-#        except Exception as e:
-#            logger.error(e)
 
     def run(self):
         self.setup_respond_handlers()

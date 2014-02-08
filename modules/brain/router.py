@@ -32,6 +32,7 @@ config.home = yaml_dict.get('home')
 config.ipc_path = yaml_dict.get('ipc_path')
 config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
+config.daemon = yaml_dict.get('daemon')
 
 
 def load_scripts():
@@ -88,6 +89,27 @@ def forwarding():
 #    loop.make_current()
     loop.start()
 
+def bring_to_daemon():
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit()
+    except OSError as e:
+        print('fork #1 faild: {0:d} ({1})'.format(e.errno, e.stderror), file=sys.stderr)
+        exit(1)
+    
+    os.chdir('/')
+    os.setsid()
+    os.umask(0)
+
+    try:
+        pid = os.fork()
+        if pid > 0:
+            print('Daemon PID {0}', pid)
+            sys.exit(0)
+    except OSError as e:
+        print('fork #2 failed: {0} ({1})'.format(e.errno, e.stderror), file=sys.stderr)
+        sys.exit(1)
 
 def run():
     import tornado.log
@@ -100,6 +122,9 @@ def run():
     p = Process(target=forwarding)
     p.start()
     logger.info('主程序开始监听')
+    if config.daemon:
+        logger.info('程序进入后台')
+        bring_to_daemon()
     p.join()
 
 if __name__ == '__main__':
