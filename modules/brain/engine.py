@@ -1,14 +1,12 @@
 # coding: utf-8
 import logging
 import re
-from abc import abstractmethod
-
 import inspect
+import threading
 
 import zmq
 from zmq.eventloop import ioloop
 from zmq.eventloop import zmqstream
-import threading
 
 from router import config
 
@@ -81,7 +79,11 @@ class Engine(object):
             [_content, _id, _type] = msg
             logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
             for handler in self.respond_handlers:
-                handler(Message((_content, _id, _type), self.push))
+                try:
+                    handler(Message((_content, _id, _type), self.push))
+                except Exception as e:
+                    logger.warn(e)
+
         except zmq.ZMQError as e:
             logger.error(e)
 

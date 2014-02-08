@@ -1,0 +1,9 @@
+.*
+*.so
+*.o
+*.pyc
+*.pyo
+*.pya
+*.log
+*.out
+*.ipc

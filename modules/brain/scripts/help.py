@@ -24,7 +24,7 @@ class Help(Engine):
                     if attr.__doc__:
                         self.helps.append(attr.__doc__)
 
-    @respond_handler('help (.*)$')
+    @respond_handler('help$')
     def respond(self, message, matches):
         res = '\n'.join(self.helps)
         message.send(res)
