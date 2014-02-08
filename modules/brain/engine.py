@@ -8,7 +8,7 @@ import zmq
 from zmq.eventloop import ioloop
 from zmq.eventloop import zmqstream
 
-from router import config
+from forwarder import config
 
 logger = logging.getLogger('')
 
@@ -106,5 +106,8 @@ class Engine(object):
 
         loop = ioloop.IOLoop.instance()
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
-        loop.start()
+        try:
+            loop.start()
+        except KeyboardInterrupt as e:
+            exit(0)
 

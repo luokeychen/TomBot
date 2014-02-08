@@ -24,13 +24,18 @@ sys.modules['config'] = types.ModuleType('config')
 import config
 
 config_file = file('{0}/../../conf/config.yaml'.format(_path))
+
 yaml_dict = yaml.load(config_file)
+logger.debug(yaml_dict)
 config.name = yaml_dict.get('name')
 config.home = yaml_dict.get('home')
 config.ipc_path = yaml_dict.get('ipc_path')
 config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
-config.daemon = yaml_dict.get('daemon')
+config.debug = yaml_dict.get('debug')
+
+if not config.debug:
+    logging.basicConfig(filename='{0}/log/tom.log'.format(config.home), level=logging.INFO)
 
 
 def load_scripts():
@@ -84,8 +89,10 @@ def forwarding():
     stream = zmqstream.ZMQStream(frontend)
     stream.on_recv(_recv)
     loop = ioloop.IOLoop.instance()
-#    loop.make_current()
-    loop.start()
+    try:
+        loop.start()
+    except KeyboardInterrupt:
+        exit(0)
 
 def run():
     import tornado.log
@@ -97,8 +104,11 @@ def run():
     # forwarding 必须在子进程中运行，否则ioloop会有问题
     p = Process(target=forwarding)
     p.start()
-    logger.info('主程序开始监听')
+    logger.info('forwarder 开始监听')
     p.join()
 
 if __name__ == '__main__':
-    run()
+    try:
+        run()
+    except KeyboardInterrupt:
+        exit(0)

@@ -1,9 +1,8 @@
 #coding: utf-8
 import imp
 from inspect import isclass, getfile
-from engine import Engine
-from engine import respond_handler
-from router import config
+from engine import Engine, respond_handler
+from forwarder import config
 
 class Help(Engine):
     '''Tom help \t[filter]'''

@@ -2,8 +2,14 @@ name: Tom
 home: /home/konglx/project/TomBot
 log_level: debug
 adapter: qq
+use_socket: False
+socket: 
+    - publish: 127.0.0.1:4441
+    - forward: 127.0.0.1:4442
+    - push: 127.0.0.1:4445
+
 ipc_path: /home/konglx/project/TomBot/run
-daemon: False
+debug: True
 
 redis_server : 127.0.0.1
 redis_port : 9673
