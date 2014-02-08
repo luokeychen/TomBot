@@ -1,5 +1,6 @@
 name: Tom
 home: /home/konglx/project/TomBot
+# 有效的取值：debug info warn error critical
 log_level: debug
 adapter: qq
 use_tcp: False
@@ -12,8 +13,10 @@ tcp_addr:
     - push_port: 4449
 
 ipc_path: /home/konglx/project/TomBot/run
+# 此处为true，那么日志级别也被自动设置为debug
 debug: True
 
+# 暂时不用
 redis_server : 127.0.0.1
 redis_port : 9673
 

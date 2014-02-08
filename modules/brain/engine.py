@@ -4,9 +4,8 @@ import re
 import inspect
 import threading
 
-import zmq
-from zmq.eventloop import ioloop
-from zmq.eventloop import zmqstream
+import zmq.green as zmq
+import gevent
 
 from forwarder import config
 
@@ -70,26 +69,27 @@ class Engine(object):
         self.respond_handlers = respond_handlers
         logger.debug('respond handlers: {0}'.format(self.respond_handlers))
 
-    def _recv(self, msg):
+    def _recv(self, socket):
         '''接收消息
         
         :param msg: 收到的消息，是个tuple
         '''
-        try:
-            [_content, _id, _type] = msg
-            logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
-            for handler in self.respond_handlers:
-                try:
-                    handler(Message((_content, _id, _type), self.push))
-                except Exception as e:
-                    logger.warn(e)
-
-        except zmq.ZMQError as e:
-            logger.error(e)
+        while True:
+            try:
+                [_content, _id, _type] = socket.recv_multipart()
+                logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
+                for handler in self.respond_handlers:
+                    try:
+                        gevent.spawn(handler, Message((_content, _id, _type), self.push))
+                    except Exception as e:
+                        logger.exception(e)
+                gevent.sleep(0)
+            # 捕获所有的异常，让脚本出错的时候继续运行
+            except Exception as e:
+                logger.exception(e)
 
     def run(self):
         self.setup_respond_handlers()
-        ioloop.install()
         # context 必须在run方法里创建
         # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
         context = zmq.Context()
@@ -98,16 +98,9 @@ class Engine(object):
 
         subscriber = context.socket(zmq.SUB)
         subscriber.connect('ipc://{0}/route.ipc'.format(config.ipc_path))
-        stream = zmqstream.ZMQStream(subscriber)
-        stream.on_recv(self._recv)
 
         for topic in self.topics:
             subscriber.setsockopt(zmq.SUBSCRIBE, topic)
 
-        loop = ioloop.IOLoop.instance()
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
-        try:
-            loop.start()
-        except KeyboardInterrupt as e:
-            exit(0)
-
+        gevent.spawn(self._recv, subscriber).join()

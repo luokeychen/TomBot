@@ -10,13 +10,10 @@ import sys
 from inspect import isclass, getfile
 
 import yaml
-import zmq
-from zmq.eventloop import ioloop
-ioloop.install()
-from zmq.eventloop import zmqstream
+import zmq.green as zmq
+import gevent
 from multiprocessing import Process
 
-logger = logging.getLogger('')
 _path = os.path.abspath(os.path.dirname(__file__))
 
 import types
@@ -26,7 +23,6 @@ import config
 config_file = file('{0}/../../conf/config.yaml'.format(_path))
 
 yaml_dict = yaml.load(config_file)
-logger.debug(yaml_dict)
 config.name = yaml_dict.get('name')
 config.home = yaml_dict.get('home')
 config.ipc_path = yaml_dict.get('ipc_path')
@@ -34,9 +30,39 @@ config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
 config.debug = yaml_dict.get('debug')
 
-if not config.debug:
-    logging.basicConfig(filename='{0}/log/tom.log'.format(config.home), level=logging.INFO)
+logger = logging.getLogger('tom_log')
 
+def init_logger():
+    '''初始化logger
+    '''
+
+    fmt = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
+
+    ch = logging.StreamHandler()
+    ch.setFormatter(fmt)
+
+    fh = logging.FileHandler('{0}/log/tom.log'.format(config.home))
+    fh.setFormatter(fmt)
+
+    logger.addHandler(fh)
+
+    if config.log_level == 'debug':
+        logger.setLevel(logging.DEBUG)
+    elif config.log_level == 'info':
+        logger.setLevel(logging.INFO)
+    elif config.log_level == 'warn':
+        logger.setLevel(logging.WARN)
+    elif config.log_level == 'error':
+        logger.setLevel(logging.ERROR)
+    elif config.log_level == 'critical':
+        logger.setLevel(logging.CRITICAL)
+    else:
+        logging.error('错误的日志级别，请设置成debug, info, warning, error, critical中的一个')
+
+
+    if config.debug:
+        logger.addHandler(ch)
+        logger.setLevel(logging.DEBUG)
 
 def load_scripts():
     '''载入插件
@@ -78,25 +104,19 @@ def forwarding():
     # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
     pattern = re.compile('^{0}'.format(name), flags=re.IGNORECASE)
 
-    def _recv(msg):
-        [_content, _id, _type] = msg
-        logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
-        _content = pattern.sub('', _content, 1).strip()
-        backend.send_multipart([_content, _id, _type])
-        logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
+    def _recv():
+        while True:
+                [_content, _id, _type] = frontend.recv_multipart()
+                logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
+                _content = pattern.sub('', _content, 1).strip()
+                backend.send_multipart([_content, _id, _type])
+                logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
+                gevent.sleep(0)
 
-    stream = zmqstream.ZMQStream(frontend)
-    stream.on_recv(_recv)
-    loop = ioloop.IOLoop.instance()
-    try:
-        loop.start()
-    except KeyboardInterrupt as e:
-        exit(0)
+    gevent.spawn(_recv).join()
 
 def run():
-    import tornado.log
-    tornado.log.enable_pretty_logging()
-    logger.setLevel(logging.DEBUG)
+    init_logger()
     logger.info('开始载入脚本...')
     load_scripts()
     logger.info('脚本载入完成')
@@ -110,4 +130,5 @@ if __name__ == '__main__':
     try:
         run()
     except KeyboardInterrupt:
+        logging.shutdown()
         exit(0)
