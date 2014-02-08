@@ -95,5 +95,6 @@ if __name__ == '__main__':
 
     stream = zmqstream.ZMQStream(pull)
     stream.on_recv(zmq_handler)
+
     webqq.run()
 

@@ -2,11 +2,14 @@ name: Tom
 home: /home/konglx/project/TomBot
 log_level: debug
 adapter: qq
-use_socket: False
-socket: 
-    - publish: 127.0.0.1:4441
-    - forward: 127.0.0.1:4442
-    - push: 127.0.0.1:4445
+use_tcp: False
+tcp_addr: 
+    - publish: 127.0.0.1
+    - publish_port: 4447
+    - forward: 127.0.0.1
+    - forward_port: 4448
+    - push: 127.0.0.1
+    - push_port: 4449
 
 ipc_path: /home/konglx/project/TomBot/run
 debug: True

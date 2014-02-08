@@ -51,8 +51,7 @@ def load_scripts():
                 try:
                     p = Process(target=_instance.run)
                 except AttributeError as e:
-                    logger.warn('脚本载入失败，错误信息：')
-                    logger.warn(e)
+                    logger.warn('脚本载入失败，错误信息：{0}'.format(e))
                     continue
                 p.start()
 
@@ -91,7 +90,7 @@ def forwarding():
     loop = ioloop.IOLoop.instance()
     try:
         loop.start()
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         exit(0)
 
 def run():
