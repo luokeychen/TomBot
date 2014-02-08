@@ -35,8 +35,8 @@ config.plugins = yaml_dict.get('plugins')
 
 
 def load_scripts():
-
-    # 载入对应文件的类
+    '''载入插件
+    '''
     for plugin in config.plugins:
         m = imp.load_source(plugin, '{0}/scripts/{1}.py'.format(_path, plugin))
         for item in dir(m):
@@ -54,6 +54,9 @@ def load_scripts():
 
 
 def forwarding():
+    '''
+    转发函数，订阅消息，并把正确的消息过滤完后送给scripts
+    '''
     name = config.name
     context = zmq.Context(1)
     frontend = context.socket(zmq.SUB)

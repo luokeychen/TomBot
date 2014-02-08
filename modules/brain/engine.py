@@ -56,10 +56,12 @@ class Engine(object):
         self.topics = []
 
     def setup_respond_handlers(self):
-
+        '''
+        获得被respond_handler装饰的函数列表
+        '''
         respond_handlers = []
         for _, handler in inspect.getmembers(self, callable):
-            # 这里用装饰过的函数名来判断被装饰过的函数列表，所以自己定义的任何callable对象，不能命名为__handler
+            # 这里用装饰过的函数名来判断被装饰过的函数列表，所以自己定义的任何callable对象，不能命名为__handler, 这个方式比较难看，不过挺管用。。。
             if handler.__name__ == '__handler':
                 if handler not in respond_handlers:
                     respond_handlers.append(handler)
@@ -93,7 +95,6 @@ class Engine(object):
         self.push.connect('ipc://{0}/push.ipc'.format(config.ipc_path))
 
         subscriber = context.socket(zmq.SUB)
-#        self.subscriber.setsockopt(zmq.IDENTITY, 'Engine')
         subscriber.connect('ipc://{0}/route.ipc'.format(config.ipc_path))
         stream = zmqstream.ZMQStream(subscriber)
         stream.on_recv(self._recv)
@@ -102,7 +103,6 @@ class Engine(object):
             subscriber.setsockopt(zmq.SUBSCRIBE, topic)
 
         loop = ioloop.IOLoop.instance()
-#        loop.make_current()
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
         loop.start()
 
