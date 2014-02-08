@@ -30,7 +30,7 @@ config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
 config.debug = yaml_dict.get('debug')
 
-logger = logging.getLogger('tom_log')
+logger = logging.getLogger('')
 
 def init_logger():
     '''初始化logger
@@ -63,6 +63,7 @@ def init_logger():
     if config.debug:
         logger.addHandler(ch)
         logger.setLevel(logging.DEBUG)
+    return logger
 
 def load_scripts():
     '''载入插件
