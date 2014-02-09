@@ -10,17 +10,15 @@ import json
 
 from tornadohttpclient import TornadoHTTPClient
 from engine import Engine, respond_handler
+from utils import run_in_thread
+import threading
+import time
 
 
 #from plugins import BasePlugin
 
 
 class SimSimiTalk(object):
-    """ 模拟浏览器与SimSimi交流
-
-    :params http: HTTP 客户端实例
-    :type http: ~tornadhttpclient.TornadoHTTPClient instance
-    """
     def __init__(self, http = None):
         self.http = http or TornadoHTTPClient()
 
@@ -34,8 +32,8 @@ class SimSimiTalk(object):
         self.ready = False
 
         self.fetch_kwargs = {}
-        self.fetch_kwargs.update(proxy_host='192.168.13.19',
-                                 proxy_port='7777')
+        #self.fetch_kwargs.update(proxy_host='192.168.13.19',
+                                 #proxy_port='7777')
 
 
         self._setup_cookie()
@@ -45,7 +43,7 @@ class SimSimiTalk(object):
         def callback(resp):
             self.ready = True
 
-        self.http.get("http://www.simsimi.com", callback = callback)
+        self.http.get("http://www.simsimi.com/talk.htm?lc=ch", callback = callback)
 
 
     def talk(self, msg, callback):
@@ -62,7 +60,6 @@ class SimSimiTalk(object):
                    }
         if not msg.strip():
             return callback("小的在")
-        print(msg)
         params = {"msg":msg}
         params.update(self.params)
 
@@ -75,22 +72,37 @@ class SimSimiTalk(object):
                     pass
             callback(data.get("response", "Server respond nothing!"))
 
-        self.http.get(self.url, params, headers = headers,
-                      callback = _talk)
+        self.http.get(self.url, params, headers=headers,
+                      callback=_talk)
 
 
 class SimSimi(Engine):
+    '''tom 中文, 智能回答（来自simsimi）'''
     topics = ['']
+    simsimi = SimSimiTalk()
+    message = None
 
-    def callback(response):
-        print response
-        simsimi.http.stop()
+    def callback(self, response):
+        self.message.send(response.encode('utf-8'))
+        self.simsimi.http.stop()
 
+#    @respond_handler(ur'^[u4e00-u9fa5]+')
     @respond_handler('.*')
     def handle_message(self, message, matches):
-        simsimi = SimSimiTalk()
-        simsimi.http.start()
-        print simsimi.talk(message.content, callback)
+        self.message = message
+        t = threading.Thread(target = self.talk, args=(message.content, self.callback))
+        t.setDaemon(True)
+        t.start()
+        self.simsimi.http.start()
+
+    def talk(self, message, callback):
+        while True:
+            if self.simsimi.ready:
+                self.simsimi.talk(message, self.callback)
+                break
+            else:
+                time.sleep(1)
+
 
 
 if __name__ == "__main__":
