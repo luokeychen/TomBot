@@ -109,14 +109,15 @@ def load_scripts():
         for item in dir(m):
             attr = getattr(m, item)
             if isclass(attr) and plugin in getfile(attr):
-                _instance = attr()
-                logger.info('正在实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
-                try:
-                    p = Process(target=_instance.run)
-                except AttributeError as e:
-                    logger.warn('脚本载入失败，错误信息：{0}'.format(e))
-                    continue
-                p.start()
+                if hasattr(attr, 'run'):
+                    _instance = attr()
+                    logger.info('正在实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
+                    try:
+                            p = Process(target=_instance.run)
+                    except AttributeError as e:
+                        logger.warn('脚本载入失败，错误信息：{0}'.format(e))
+                        continue
+                    p.start()
 
 
 def forwarding():
