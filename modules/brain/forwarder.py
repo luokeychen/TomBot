@@ -1,4 +1,40 @@
-# coding: utf-8
+#!/usr/bin/env python
+# -*- coding:utf-8 -*-
+#
+#  Copyright (C) 2014 konglx
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#  1. Redistributions of source code must retain the above copyright
+#  notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#  notice, this list of conditions and the following disclaimer in the
+#  documentation and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY konglx ''AS IS'' AND ANY
+#  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL konglx BE LIABLE FOR ANY
+#  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+#  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+#   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+#  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+#  The views and conclusions contained in the software and documentation
+#  are those of the authors and should not be interpreted as representing
+#  official policies, either expressedor implied, of konglx.
+#
+#  File        : forwarder.py
+#  Author      : konglx
+#  Email       : jayklx@gmail.com
+#  Date        : 2014-02-09
+#  Description : forwarder for TomBot
+
+    
 from __future__ import print_function
 
 import re
@@ -105,14 +141,20 @@ def forwarding():
     # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
     pattern = re.compile('^{0}'.format(name), flags=re.IGNORECASE)
 
+    poller = zmq.Poller()
+    poller.register(frontend, zmq.POLLIN)
+
     def _recv():
         while True:
+            socks = dict(poller.poll())
+            if frontend in socks and socks[frontend] == zmq.POLLIN:
                 [_content, _id, _type] = frontend.recv_multipart()
                 logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
                 _content = pattern.sub('', _content, 1).strip()
+                #这里暂时切出，避免socket异常
+                gevent.sleep(0)
                 backend.send_multipart([_content, _id, _type])
                 logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
-                gevent.sleep(0)
 
     gevent.spawn(_recv).join()
 
