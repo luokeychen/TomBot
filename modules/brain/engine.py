@@ -37,6 +37,7 @@
     
 import logging
 import re
+
 import inspect
 import threading
 
@@ -56,9 +57,9 @@ def respond_handler(arg):
     regexp = re.compile(arg, re.IGNORECASE)
     def _handler(func):
         def __handler(*args, **kwargs):
-            matches = re.match(regexp, args[1].content.decode('utf-8'))
+            matches = re.match(regexp, args[1].content)
             if matches:
-                print('匹配到正则表达式: {0}'.format(regexp.__str__()))
+                print('匹配到正则表达式: {0}'.format(str(matches)))
                 return func(args[0], args[1], matches)
             else:
                 return None
@@ -74,7 +75,7 @@ class Message(object):
     def __init__(self, message, socket):
         self.msg = message
         self.content, self.id, self.type = message
-        self.content = self.content.decode('utf-8').encode('utf-8')
+        self.content = self.content
         self.socket = socket
 
     def send(self, content):
@@ -120,7 +121,7 @@ class Engine(object):
                 logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
                 for handler in self.respond_handlers:
                     try:
-                        gevent.spawn(handler, Message((_content, _id, _type), self.push))
+                        gevent.spawn(handler, Message((_content.decode('utf-8'), _id, _type), self.push))
                     except Exception as e:
                         logger.exception(e)
 

@@ -59,7 +59,7 @@ class SimSimiTalk(object):
                    "X-Requested-With":"XMLHttpRequest",
                    }
         if not msg.strip():
-            return callback("呵呵".encode('utf-8'))
+            return callback(u"呵呵".encode('utf-8'))
         params = {"msg":msg}
         params.update(self.params)
 
@@ -97,7 +97,7 @@ class SimSimi(Engine):
     def talk(self, message, callback):
         while True:
             if self.simsimi.ready:
-                self.simsimi.talk(message, self.callback)
+                self.simsimi.talk(message.encode('utf-8'), self.callback)
                 break
             else:
                 time.sleep(1)

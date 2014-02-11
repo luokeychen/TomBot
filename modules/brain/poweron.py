@@ -1,5 +1,10 @@
 # coding: utf-8
 from multiprocessing import Process
+import logging
+from gevent.monkey import patch_all
+patch_all(thread=False)
+import geventhttpclient.httplib
+geventhttpclient.httplib.patch()
 from forwarder import init_logger, load_scripts, forwarding
 
 
