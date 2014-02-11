@@ -59,7 +59,7 @@ class SimSimiTalk(object):
                    "X-Requested-With":"XMLHttpRequest",
                    }
         if not msg.strip():
-            return callback("小的在")
+            return callback("呵呵".encode('utf-8'))
         params = {"msg":msg}
         params.update(self.params)
 
@@ -86,8 +86,7 @@ class SimSimi(Engine):
         self.message.send(response.encode('utf-8'))
         self.simsimi.http.stop()
 
-#    @respond_handler(ur'^[u4e00-u9fa5]+')
-    @respond_handler('.*')
+    @respond_handler(u'^[\u4e00-\u9fa5]+')
     def handle_message(self, message, matches):
         self.message = message
         t = threading.Thread(target = self.talk, args=(message.content, self.callback))

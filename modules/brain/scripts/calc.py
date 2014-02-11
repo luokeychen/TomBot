@@ -19,7 +19,7 @@ class Caculator(Engine):
 
     @respond_handler('calc (.*)$')
     def respond(self, message, matches):
-        expression= matches.group(1)
+        expression= matches.group(1).encode('utf-8')
         try:
             result = self.calculate(expression)
             message.send(result)

@@ -53,11 +53,12 @@ def respond_handler(arg):
 
     :param arg: arg应是一个合法的正则表达式
     '''
-    regexp = re.compile(arg, re.I)
+    regexp = re.compile(arg, re.IGNORECASE)
     def _handler(func):
         def __handler(*args, **kwargs):
-            matches = re.match(regexp, args[1].content)
+            matches = re.match(regexp, args[1].content.decode('utf-8'))
             if matches:
+                print('匹配到正则表达式: {0}'.format(regexp.__str__()))
                 return func(args[0], args[1], matches)
             else:
                 return None
@@ -73,6 +74,7 @@ class Message(object):
     def __init__(self, message, socket):
         self.msg = message
         self.content, self.id, self.type = message
+        self.content = self.content.decode('utf-8').encode('utf-8')
         self.socket = socket
 
     def send(self, content):

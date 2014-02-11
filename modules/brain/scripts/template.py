@@ -1,7 +1,7 @@
 # coding: utf-8
 from engine import Engine, respond_handler
 
-# 类名及脚本名写到scripts.json中，以启用脚本
+# 类名及脚本名写到config.yaml的plugins列表下，以启用脚本
 # 在docstring定义的字符串，将会在help.py脚本中得到并展示出来
 class Template(Engine):
     '''用法描述'''
