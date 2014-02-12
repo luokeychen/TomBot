@@ -44,7 +44,7 @@ class Flow(Engine):
                     coo.COO_PKP_FLOW_SQL_CFG.GETFLOWTITLE(T1.FLOW_ID,T1.FLOW_MOD) TITLE
                     FROM coo.FLOW T1,coo.TACHE T2 where t1.flow_id = t2.flow_id) t3
                     where t3.title like ''' + "'" + title + "'" + ' order by flow_type desc'
-        sql2 = sql2.decode('utf-8').encode('gbk')
+        sql2 = sql2.encode('gbk')
         url = 'http://117.27.132.23:20006/workshop/form/index.jsp?flowId='
         if serial:
             try:
@@ -69,7 +69,7 @@ class Flow(Engine):
         message.send(result)
 
     def check_contain_chinese(self, check_str):
-        for ch in check_str.decode('utf-8'):
+        for ch in check_str:
             if u'\u4e00' <= ch <= u'\u9fff':
                 return True
         return False
