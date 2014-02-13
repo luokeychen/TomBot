@@ -10,6 +10,8 @@
     usage:
         python qq.py [qq] [password]
 '''
+import geventhttpclient.httplib
+geventhttpclient.httplib.patch()
 import logging
 import zmq
 from zmq.eventloop import zmqstream, ioloop
