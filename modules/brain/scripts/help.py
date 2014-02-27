@@ -3,6 +3,7 @@ import imp
 from inspect import isclass, getfile
 from engine import Engine, respond_handler
 from forwarder import config
+import logging
 
 class Help(Engine):
     '''Tom help \t[filter]'''
@@ -16,7 +17,11 @@ class Help(Engine):
 
         # 载入对应文件的类
         for plugin in config.plugins:
-            m = imp.load_source(plugin, '{0}/modules/brain/scripts/{1}.py'.format(config.home, plugin))
+            try:
+                m = imp.load_source(plugin, '{0}/modules/brain/scripts/{1}.py'.format(config.home, plugin))
+            except IOError as e:
+                logging.warn(e)
+                logging.warn('plugin:{0}'.format(plugin))
             for item in dir(m):
                 attr = getattr(m, item)
                 if isclass(attr) and plugin in getfile(attr):
