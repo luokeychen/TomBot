@@ -65,6 +65,7 @@ config.ipc_path = yaml_dict.get('ipc_path')
 config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
 config.debug = yaml_dict.get('debug')
+config.ansibles = yaml_dict.get('ansibles')
 
 logger = logging.getLogger('')
 

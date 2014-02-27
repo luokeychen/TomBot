@@ -39,7 +39,6 @@ import logging
 import re
 
 import inspect
-import threading
 
 import zmq.green as zmq
 import gevent
@@ -71,6 +70,7 @@ class Message(object):
     '''包装消息，方便保存上下文
     
     :param message: 消息tuple
+    :param socket: pull模式的zmq socket
     '''
     def __init__(self, message, socket):
         self.msg = message
@@ -81,10 +81,11 @@ class Message(object):
     def send(self, content):
         self.socket.send_multipart([content, self.id, self.type])
         logging.debug('推送消息到adapter: {0}'.format((content, self.id, self.type)))
+        
 
 class Engine(object):
     '''
-    插件应继承此类
+    插件应继承此类, 并定制topics
 
     '''
 
@@ -109,11 +110,11 @@ class Engine(object):
     def _recv(self, socket):
         '''接收消息
         
-        :param msg: 收到的消息，是个tuple
+        :param socket: 一个socket连接，pull模式
         '''
         poller = zmq.Poller()
         poller.register(socket, zmq.POLLIN)
-
+        
         while True:
             socks = dict(poller.poll())
             if socket in socks and socks[socket] == zmq.POLLIN:

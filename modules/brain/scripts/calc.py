@@ -38,6 +38,7 @@ class Caculator(Engine):
         exp = exp.replace('（', '(')
         exp = exp.replace('）', ')')
         exp = exp.replace('×', '*')
+        exp = exp.replace(',', '')
         exp = exp.replace('x', '*')
         exp = exp.replace('﹢', '+')
         exp = exp.replace('÷', '/')
