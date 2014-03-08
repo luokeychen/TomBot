@@ -46,11 +46,17 @@ import sys
 from inspect import isclass, getfile
 
 import yaml
-import zmq.green as zmq
-import gevent
-from multiprocessing import Process
+import zmq
+from zmq.eventloop import zmqstream
+from zmq.eventloop import ioloop
+ioloop.install()
+# import zmq.green as zmq
+# import gevent
+from threading import Thread
 
 _path = os.path.abspath(os.path.dirname(__file__))
+
+from user_manager import Room, RoomManager
 
 import types
 sys.modules['config'] = types.ModuleType('config')
@@ -66,22 +72,30 @@ config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
 config.debug = yaml_dict.get('debug')
 config.ansibles = yaml_dict.get('ansibles')
+config.command_prefix = yaml_dict.get('command_prefix')
+config.subpub_socket = yaml_dict.get('subpub_socket')
+config.pullpush_socket = yaml_dict.get('pullpush_socket')
+config.use_tcp = yaml_dict.get('use_tcp')
 
 logger = logging.getLogger('')
+
 
 def init_logger():
     '''初始化logger
     '''
+    import tornado.log
 
-    fmt = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
+    tornado.log.enable_pretty_logging()
 
-    ch = logging.StreamHandler()
-    ch.setFormatter(fmt)
+    # fmt = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
 
-    fh = logging.FileHandler('{0}/log/tom.log'.format(config.home))
-    fh.setFormatter(fmt)
+    # ch = logging.StreamHandler()
+    # ch.setFormatter(fmt)
 
-    logger.addHandler(fh)
+    # fh = logging.FileHandler('{0}/log/tom.log'.format(config.home))
+    # fh.setFormatter(fmt)
+
+    # logger.addHandler(fh)
 
     if config.log_level == 'debug':
         logger.setLevel(logging.DEBUG)
@@ -97,14 +111,23 @@ def init_logger():
         logging.error('错误的日志级别，请设置成debug, info, warning, error, critical中的一个')
 
 
-    if config.debug:
-        logger.addHandler(ch)
-        logger.setLevel(logging.DEBUG)
+    # if config.debug:
+    #     logger.addHandler(ch)
+    #     logger.setLevel(logging.DEBUG)
     return logger
+
+context = zmq.Context()
+push = context.socket(zmq.PUSH)
+if config.use_tcp:
+    push.bind(config.pullpush_socket)
+else:
+    push.bind('ipc://{0}/push.ipc'.format(config.ipc_path))
+
 
 def load_scripts():
     '''载入插件
     '''
+
     for plugin in config.plugins:
         m = imp.load_source(plugin, '{0}/scripts/{1}.py'.format(_path, plugin))
         for item in dir(m):
@@ -114,9 +137,32 @@ def load_scripts():
                     _instance = attr()
                     logger.info('正在实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
                     try:
-                            p = Process(target=_instance.run)
+#                            p = Process(target=_instance.run, args=(push,))
+                            p = Thread(target=_instance.run, args=(push,))
+                            p.daemon = False
                     except AttributeError as e:
                         logger.warn('脚本载入失败，错误信息：{0}'.format(e))
+                        continue
+                    p.start()
+
+
+def load_runners():
+    '''载入ansible脚本
+    '''
+    for ansible in config.ansibles:
+        m = imp.load_source(ansible, '{0}/../ansible/{1}.py'.format(_path, ansible))
+        for item in dir(m):
+            attr = getattr(m, item)
+            if isclass(attr) and ansible in getfile(attr):
+                if hasattr(attr, 'run'):
+                    _instance = attr()
+                    logger.info('正在实例化ansible脚本{0}的{1}类...'.format(ansible, attr.__name__))
+                    try:
+#                            p = Process(target=_instance.run, args=(push,))
+                            p = Thread(target=_instance.run, args=(push,))
+                            p.daemon = False
+                    except AttributeError as e:
+                        logger.warn('ansible脚本载入失败，错误信息：{0}'.format(e))
                         continue
                     p.start()
 
@@ -128,52 +174,68 @@ def forwarding():
     name = config.name
     context = zmq.Context(1)
     frontend = context.socket(zmq.SUB)
+    #ZMQ 4.0 以上才支持
+    # frontend.setsockopt(zmq.CURVE_SERVER)
     frontend.setsockopt(zmq.IDENTITY, 'Frontend')
+
+    filters = [config.name, '@' + name, config.name.lower(), config.name.upper(),
+               config.name.capitalize()]
     # 订阅以机器人名字开头的消息，包括小写、大写、首字母大写
 
-    frontend.setsockopt(zmq.SUBSCRIBE, '@' + name)
-    frontend.setsockopt(zmq.SUBSCRIBE, name.lower())
-    frontend.setsockopt(zmq.SUBSCRIBE, name.upper())
-    frontend.setsockopt(zmq.SUBSCRIBE, name.capitalize())
-    frontend.bind('ipc://{0}/publish.ipc'.format(config.ipc_path))
+    for _filter in filters:
+        frontend.setsockopt(zmq.SUBSCRIBE, _filter)
+
+    if config.use_tcp:
+        frontend.bind(config.subpub_socket)
+    else:
+        frontend.bind('ipc://{0}/publish.ipc'.format(config.ipc_path))
 
     backend = context.socket(zmq.PUB)
     backend.setsockopt(zmq.IDENTITY, 'Backend')
     backend.bind('ipc://{0}/route.ipc'.format(config.ipc_path))
     # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
-    pattern = re.compile('^{0}'.format(name), flags=re.IGNORECASE)
 
-    poller = zmq.Poller()
-    poller.register(frontend, zmq.POLLIN)
+    room_manager = RoomManager()
 
-    def _recv():
-        while True:
-            socks = dict(poller.poll())
-            if frontend in socks and socks[frontend] == zmq.POLLIN:
-                [_content, _id, _type] = frontend.recv_multipart()
-                logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
-                _content = pattern.sub('', _content, 1).strip()
-                #这里暂时切出，避免socket异常
-                gevent.sleep(0)
-                backend.send_multipart([_content, _id, _type])
-                logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
+    def callback(msg):
+        [_content, _id, _type] = msg
 
-    gevent.spawn(_recv).join()
+        #若该房间不在字典中，则添加一个
+        if not room_manager.get_room(_id):
+            room = Room(_id)
+            room_manager.add_room(room)
+        else:
+            room = room_manager.get_room(_id)
 
-def run():
-    init_logger()
-    logger.info('开始载入脚本...')
-    load_scripts()
-    logger.info('脚本载入完成')
-    # forwarding 必须在子进程中运行，否则ioloop会有问题
-    p = Process(target=forwarding)
-    p.start()
-    logger.info('forwarder 开始监听')
-    p.join()
+        logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
+        if _content.strip() == 'tom mode cmd':
+            room.mode = 'command'
+            logger.info('切换到command模式')
+            backend.send_multipart([str('notify Tom已切换到command模式'), _id, _type])
+            frontend.setsockopt(zmq.SUBSCRIBE, '')
+            return
+        if _content.strip() == 'tom mode normal':
+            room.mode = 'normal'
+            logger.info('切换到normal模式')
+            backend.send_multipart([str('notify Tom已切换到normal模式'), _id, _type])
+            frontend.setsockopt(zmq.UNSUBSCRIBE, '')
+            return
 
-if __name__ == '__main__':
+        if room.mode == 'command':
+            if re.compile('^[a-z]').match(_content):
+                _content = 'exec ' + _content
+        else:
+            pattern = re.compile('^{0}'.format(config.name), flags=re.IGNORECASE)
+            _content = pattern.sub('', _content, 1).strip()
+        backend.send_multipart([_content, _id, _type])
+        logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
+
+    stream = zmqstream.ZMQStream(frontend)
+    stream.on_recv(callback)
+
+    loop = ioloop.IOLoop.instance()
     try:
-        run()
+        loop.start()
     except KeyboardInterrupt:
-        logging.shutdown()
-        exit(0)
+        logger.info('收到退出信号，程序退出...')
+        ioloop.IOLoop.instance().stop()

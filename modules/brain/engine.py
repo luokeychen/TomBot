@@ -34,16 +34,19 @@
 #  Date        : 2014-02-09
 #  Description : engine for TomBot
 
+import sys
     
 import logging
 import re
 
 import inspect
+import functools
 
-import zmq.green as zmq
-import gevent
-
+import zmq
+from zmq.eventloop import ioloop, zmqstream
+ioloop.install()
 from forwarder import config
+
 
 logger = logging.getLogger('')
 
@@ -58,7 +61,7 @@ def respond_handler(arg):
         def __handler(*args, **kwargs):
             matches = re.match(regexp, args[1].content)
             if matches:
-                print('匹配到正则表达式: {0}'.format(str(matches)))
+#                print('匹配到正则表达式: {0}'.format(matches.string))
                 return func(args[0], args[1], matches)
             else:
                 return None
@@ -68,7 +71,7 @@ def respond_handler(arg):
 
 class Message(object):
     '''包装消息，方便保存上下文
-    
+
     :param message: 消息tuple
     :param socket: pull模式的zmq socket
     '''
@@ -81,7 +84,7 @@ class Message(object):
     def send(self, content):
         self.socket.send_multipart([content, self.id, self.type])
         logging.debug('推送消息到adapter: {0}'.format((content, self.id, self.type)))
-        
+
 
 class Engine(object):
     '''
@@ -107,32 +110,24 @@ class Engine(object):
         self.respond_handlers = respond_handlers
         logger.debug('respond handlers: {0}'.format(self.respond_handlers))
 
-    def _recv(self, socket):
+    def _recv(self, msg, socket=None):
         '''接收消息
-        
+
         :param socket: 一个socket连接，pull模式
         '''
-        poller = zmq.Poller()
-        poller.register(socket, zmq.POLLIN)
-        
-        while True:
-            socks = dict(poller.poll())
-            if socket in socks and socks[socket] == zmq.POLLIN:
-                [_content, _id, _type] = socket.recv_multipart()
-                logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
-                for handler in self.respond_handlers:
-                    try:
-                        gevent.spawn(handler, Message((_content.decode('utf-8'), _id, _type), self.push))
-                    except Exception as e:
-                        logger.exception(e)
+        [_content, _id, _type] = msg
+        logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
+        for handler in self.respond_handlers:
+            try:
+                handler(Message((_content.decode('utf-8'), _id, _type), socket))
+            except Exception as e:
+                logger.exception(e)
 
-    def run(self):
+    def run(self, push):
         self.setup_respond_handlers()
         # context 必须在run方法里创建
         # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
-        context = zmq.Context()
-        self.push = context.socket(zmq.PUSH)
-        self.push.connect('ipc://{0}/push.ipc'.format(config.ipc_path))
+        context = zmq.Context(1)
 
         subscriber = context.socket(zmq.SUB)
         subscriber.connect('ipc://{0}/route.ipc'.format(config.ipc_path))
@@ -141,4 +136,13 @@ class Engine(object):
             subscriber.setsockopt(zmq.SUBSCRIBE, topic)
 
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
-        gevent.spawn(self._recv, subscriber).join()
+        stream = zmqstream.ZMQStream(subscriber)
+        callback = functools.partial(self._recv, socket=push)
+        stream.on_recv(callback)
+
+#        loop = ioloop.IOLoop.instance()
+
+#        try:
+#            loop.start()
+#        except KeyboardInterrupt:
+#            exit(0)
