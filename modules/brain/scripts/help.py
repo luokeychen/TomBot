@@ -1,34 +1,22 @@
 #coding: utf-8
-import imp
-from inspect import isclass, getfile
 from engine import Engine, respond_handler
-from forwarder import config
-import logging
+
 
 class Help(Engine):
     '''Tom help \t[filter]'''
 
     def __init__(self):
         self.topics = ['help']
-        self.helps = []
-        self.get_helps()
-
-    def get_helps(self):
-
-        # 载入对应文件的类
-        for plugin in config.plugins:
-            try:
-                m = imp.load_source(plugin, '{0}/modules/brain/scripts/{1}.py'.format(config.home, plugin))
-            except IOError as e:
-                logging.warn(e)
-                logging.warn('plugin:{0}'.format(plugin))
-            for item in dir(m):
-                attr = getattr(m, item)
-                if isclass(attr) and plugin in getfile(attr):
-                    if attr.__doc__:
-                        self.helps.append(attr.__doc__)
+        self.helps = '=================指令列表================\n'\
+                'Tom help            显示此信息\n'\
+                'Tom?                获取随机应答\n'\
+                'Tom calc 1+1        计算器，支持四则运算、位运算等等\n'\
+                'Tom flow 单号|标题  查询部门服务流程\n'\
+                'Tom exec df -h      执行命令，服务器需预先配置\n'\
+                'Tom 中文            [联网]调戏用，智能回答，来自simsimi\n'\
+                'Tom make me laugh   [联网]随机发送一则来自糗百的笑话\n'\
+                'Tom mode cmd|normal 切换命令模式与正常模式'
 
     @respond_handler('help$')
     def respond(self, message, matches):
-        res = '\n'.join(self.helps)
-        message.send(res)
+        message.send(self.helps)

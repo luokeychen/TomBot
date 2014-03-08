@@ -10,7 +10,6 @@ import json
 
 from tornadohttpclient import TornadoHTTPClient
 from engine import Engine, respond_handler
-from utils import run_in_thread
 import threading
 import time
 
@@ -19,7 +18,7 @@ import time
 
 
 class SimSimiTalk(object):
-    def __init__(self, http = None):
+    def __init__(self, http=None):
         self.http = http or TornadoHTTPClient()
 
         if not http:
@@ -28,23 +27,20 @@ class SimSimiTalk(object):
             self.http.set_global_headers({"Accept-Charset": "UTF-8,*;q=0.5"})
 
         self.url = "http://www.simsimi.com/func/req"
-        self.params = {"lc":"ch", "ft":0.0}
+        self.params = {"lc": "ch", "ft": 0.0}
         self.ready = False
 
         self.fetch_kwargs = {}
         #self.fetch_kwargs.update(proxy_host='192.168.13.19',
                                  #proxy_port='7777')
 
-
         self._setup_cookie()
-
 
     def _setup_cookie(self):
         def callback(resp):
             self.ready = True
 
-        self.http.get("http://www.simsimi.com/talk.htm?lc=ch", callback = callback)
-
+        self.http.get("http://www.simsimi.com/talk.htm?lc=ch", callback=callback)
 
     def talk(self, msg, callback):
         """ 聊天
@@ -52,15 +48,15 @@ class SimSimiTalk(object):
         :param msg: 信息
         :param callback: 接收响应的回调
         """
-        headers = {"Referer":"http://www.simsimi.com/talk.htm?lc=ch",
-                   "Accept":"application/json, text/javascript, */*; q=0.01",
-                   "Accept-Language":"zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3",
-                   "Content-Type":"application/json; charset=utf-8",
-                   "X-Requested-With":"XMLHttpRequest",
+        headers = {"Referer": "http://www.simsimi.com/talk.htm?lc=ch",
+                   "Accept": "application/json, text/javascript, */*; q=0.01",
+                   "Accept-Language": "zh-cn,zh;q=0.8,en-us;q=0.5,en;q=0.3",
+                   "Content-Type": "application/json; charset=utf-8",
+                   "X-Requested-With": "XMLHttpRequest",
                    }
         if not msg.strip():
             return callback(u"呵呵".encode('utf-8'))
-        params = {"msg":msg}
+        params = {"msg": msg}
         params.update(self.params)
 
         def _talk(resp):
@@ -89,7 +85,7 @@ class SimSimi(Engine):
     @respond_handler(u'^[\u4e00-\u9fa5]+')
     def handle_message(self, message, matches):
         self.message = message
-        t = threading.Thread(target = self.talk, args=(message.content, self.callback))
+        t = threading.Thread(target=self.talk, args=(message.content, self.callback))
         t.setDaemon(True)
         t.start()
         self.simsimi.http.start()
@@ -103,10 +99,9 @@ class SimSimi(Engine):
                 time.sleep(1)
 
 
-
 if __name__ == "__main__":
-    import threading,time
     simsimi = SimSimiTalk()
+
     def callback(response):
         print response
         simsimi.http.stop()
@@ -119,8 +114,7 @@ if __name__ == "__main__":
             else:
                 time.sleep(1)
 
-    t = threading.Thread(target = talk)
+    t = threading.Thread(target=talk)
     t.setDaemon(True)
     t.start()
-    simsimi.http.start()
 
