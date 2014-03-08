@@ -21,8 +21,7 @@ import os
 sys.path.append('./twqq')
 from twqq.client import WebQQClient
 from twqq.requests import system_message_handler, group_message_handler, discu_message_handler
-from twqq.requests import buddy_message_handler, register_request_handler
-from twqq.requests import PollMessageRequest
+from twqq.requests import buddy_message_handler, kick_message_handler
 
 
 logger = logging.getLogger('client')
@@ -31,9 +30,11 @@ ioloop.install()
 context = zmq.Context(1)
 pub = context.socket(zmq.PUB)
 _home = os.getenv('TOMBOT_HOME')
-pub.connect('ipc://{0}/run/publish.ipc'.format(_home))
+# pub.connect('ipc://{0}/run/publish.ipc'.format(_home))
+pub.connect('tcp://192.168.3.107:4445')
 pull = context.socket(zmq.PULL)
-pull.bind('ipc://{0}/run/push.ipc'.format(_home))
+# pull.connect('ipc://{0}/run/push.ipc'.format(_home))
+pull.connect('tcp://192.168.3.107:4444')
 
 
 class Client(WebQQClient):
@@ -41,9 +42,8 @@ class Client(WebQQClient):
         logger.info(u'验证码本地路径为: {0}'.format(path))
         check_code = None
         while not check_code:
-            check_code = raw_input('输入验证码: ')
+            check_code = raw_input(u'输入验证码: ')
         self.enter_verify_code(check_code, r, uin)
-
 
     @system_message_handler
     def handle_friend_add(self, mtype, from_uin, account, message):
@@ -51,28 +51,21 @@ class Client(WebQQClient):
             self.hub.accept_verify(from_uin, account, account)
 
     @discu_message_handler
-    def handle_discu_message(self, member_uin, content, did,
-                             send_uin, source):
+    def handle_discu_message(self, did, from_uin, content, source):
         pub.send_multipart([content.encode('utf-8'), str(did), 'discu'])
-#        self.hub.send_discu_msg(did, u'{0}'.format(content))
 
     @group_message_handler
     def handle_group_message(self, member_nick, content, group_code,
                              send_uin, source):
         pub.send_multipart([content.encode('utf-8'), str(group_code), 'group'])
-#        self.hub.send_group_msg(group_code, u'{0}'.format(content))
 
     @buddy_message_handler
     def handle_buddy_message(self, from_uin, content, source):
         pub.send_multipart([content.encode('utf-8'), str(from_uin), 'buddy'])
-#        self.hub.send_buddy_msg(from_uin, content)
 
-
-    # @register_request_handler(PollMessageRequest)
-    # def handle_qq_errcode(self, request, resp, data):
-    #     if data and data.get('retcode') in [121, 100006]:
-    #         logger.error(u'获取登出消息 {0!r}'.format(data))
-    #         exit()
+    @kick_message_handler
+    def handle_kick(self, message):
+        self.hub.relogin()
 
 
 if __name__ == '__main__':
@@ -85,7 +78,7 @@ if __name__ == '__main__':
 
     def zmq_handler(msg):
         _content, _id,  _type = msg
-        _content = _content.decode('utf-8').encode('utf-8')
+        _content = _content.decode('utf-8')
         if _type == 'buddy':
             webqq.hub.send_buddy_msg(int(_id), _content)
         elif _type == 'group':
