@@ -80,7 +80,6 @@ class SimSimi(Engine):
 
     def callback(self, response):
         self.message.send(response.encode('utf-8'))
-        self.simsimi.http.stop()
 
     @respond_handler(u'^[\u4e00-\u9fa5]+')
     def handle_message(self, message, matches):
@@ -88,7 +87,6 @@ class SimSimi(Engine):
         t = threading.Thread(target=self.talk, args=(message.content, self.callback))
         t.setDaemon(True)
         t.start()
-        self.simsimi.http.start()
 
     def talk(self, message, callback):
         while True:
@@ -103,7 +101,6 @@ if __name__ == "__main__":
     simsimi = SimSimiTalk()
 
     def callback(response):
-        print response
         simsimi.http.stop()
 
     def talk():
@@ -117,4 +114,4 @@ if __name__ == "__main__":
     t = threading.Thread(target=talk)
     t.setDaemon(True)
     t.start()
-
+    simsimi.http.start()
