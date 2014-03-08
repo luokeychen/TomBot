@@ -50,24 +50,27 @@ class SimpleRunner(Engine):
         self.inventory = ansible.inventory.Inventory(inventory_file)
 
 # construct the ansible runner and execute on all hosts
-    @respond_handler('exec (.*)$')
+    # @respond_handler('exec (\w+) (on)? (\w*)$')
+    # TODO 指定主机
+    @respond_handler('exec (\w+)(.*)')
     def handler(self, message, matches):
 
         accept_commands = ['uptime', 'ls', 'df', 'du', 'vmstat', 'iostat', 'netstat', 'sar',
                            'free', 'cat', 'base64', 'grep', 'find', 'id', 'which', 'whereis',
-                           'locate', 'ipcs', 'locale', 'lsattr', 'lspci', 'lscpu', 'lspv',
+                           'locate', 'ipcs', 'locale', 'lsof', 'lsattr', 'lspci', 'lscpu', 'lspv',
                            'lsvg', 'lslv', 'vgdisplay', 'lvdisplay', 'pvdisplay', 'ps', 'pstree',
                            'ulimit', 'dmesg', 'head', 'tail', 'hostname', 'ifconfig', 'lsblk',
                            'uname']
 
+        pattern = '*'
+
         for command in accept_commands:
-            if command in matches.group(1):
+            if command == matches.group(1):
                 runner = ansible.runner.Runner(
-                    pattern='*',
+                    pattern=pattern,
                     timeout=5,
-                    module_name='command',
-                    module_args=matches.group(1),
-        #            remote_user='temp',
+                    module_name='raw',
+                    module_args=matches.group(),
                     inventory=self.inventory
                 )
                 results = runner.run()
@@ -93,4 +96,3 @@ class SimpleRunner(Engine):
 
         message.send('禁止执行的命令!')
         return 1
-        
