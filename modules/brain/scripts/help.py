@@ -7,6 +7,7 @@ class Help(Engine):
 
     def __init__(self):
         self.topics = ['help']
+        # 帮助写死了，为了那么点方便搞这么麻烦不值得
         self.helps = '=================指令列表================\n'\
                 'Tom help            显示此信息\n'\
                 'Tom?                获取随机应答\n'\

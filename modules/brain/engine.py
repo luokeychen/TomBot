@@ -43,8 +43,7 @@ import inspect
 import functools
 
 import zmq
-from zmq.eventloop import ioloop, zmqstream
-ioloop.install()
+from zmq.eventloop import zmqstream
 from forwarder import config
 
 
@@ -57,7 +56,8 @@ def respond_handler(arg):
     :param arg: arg应是一个合法的正则表达式
     '''
     regexp = re.compile(arg, re.IGNORECASE)
-    def _handler(func):
+
+    def wrapper(func):
         def __handler(*args, **kwargs):
             matches = re.match(regexp, args[1].content)
             if matches:
@@ -66,7 +66,7 @@ def respond_handler(arg):
             else:
                 return None
         return __handler
-    return _handler
+    return wrapper
 
 
 class Message(object):
@@ -139,10 +139,3 @@ class Engine(object):
         stream = zmqstream.ZMQStream(subscriber)
         callback = functools.partial(self._recv, socket=push)
         stream.on_recv(callback)
-
-#        loop = ioloop.IOLoop.instance()
-
-#        try:
-#            loop.start()
-#        except KeyboardInterrupt:
-#            exit(0)

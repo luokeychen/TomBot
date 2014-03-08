@@ -21,7 +21,7 @@ import os
 sys.path.append('./twqq')
 from twqq.client import WebQQClient
 from twqq.requests import system_message_handler, group_message_handler, discu_message_handler
-from twqq.requests import buddy_message_handler, kick_message_handler
+from twqq.requests import buddy_message_handler, kick_message_handler, register_request_handler, PollMessageRequest
 
 
 logger = logging.getLogger('client')
@@ -67,6 +67,16 @@ class Client(WebQQClient):
     def handle_kick(self, message):
         self.hub.relogin()
 
+    @register_request_handler(PollMessageRequest)
+    def handle_qq_errcode(self, request, resp, data):
+        if data and data.get("retcode") in [100006]:
+            logger.error(u"获取登出消息 {0!r}".format(data))
+            self.hub.relogin()
+
+        if data and data.get("retcode") in [103]:  # 103重新登陆不成功, 暂时退出
+            logger.error(u"获取登出消息 {0!r}".format(data))
+            exit()
+
 
 if __name__ == '__main__':
     import sys
@@ -91,5 +101,7 @@ if __name__ == '__main__':
     stream = zmqstream.ZMQStream(pull)
     stream.on_recv(zmq_handler)
 
+try:
     webqq.run()
-
+except KeyboardInterrupt:
+    logger.info("收到退出信号，程序退出...")
