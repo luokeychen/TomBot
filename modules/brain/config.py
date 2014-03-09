@@ -67,4 +67,4 @@ use_proxy = yaml_dict.get('use_proxy')
 proxy_host = yaml_dict.get('proxy_host')
 proxy_port = yaml_dict.get('proxy_port')
 
-default_mode = yaml_dict.get('deault_mode')
+default_mode = yaml_dict.get('default_mode')
