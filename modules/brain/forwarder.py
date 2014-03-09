@@ -120,21 +120,13 @@ def forwarding():
     '''
     转发函数，订阅消息，并把正确的消息过滤完后送给scripts
     '''
-    name = config.name
     context = zmq.Context(1)
     frontend = context.socket(zmq.SUB)
     #ZMQ 4.0 以上才支持
     # frontend.setsockopt(zmq.CURVE_SERVER)
     frontend.setsockopt(zmq.IDENTITY, 'Frontend')
 
-    filters = [config.name, '@' + name, config.name.lower(), config.name.upper(),
-               config.name.capitalize()]
-    # 订阅以机器人名字开头的消息，包括小写、大写、首字母大写
-
     frontend.setsockopt(zmq.SUBSCRIBE, '')
-
-    for _filter in filters:
-        frontend.setsockopt(zmq.SUBSCRIBE, _filter)
 
     if config.use_tcp:
         frontend.bind(config.subpub_socket)
@@ -167,15 +159,13 @@ def forwarding():
         if _content.strip() == 'tom mode cmd':
             room.mode = 'command'
             logger.info('切换到command模式')
-            frontend.setsockopt(zmq.SUBSCRIBE, '')
-            backend.send_json(make_msg(str('notify Tom已切换到command模式'), _id, _type))
+            backend.send_json(make_msg('notify Tom已切换到command模式', _id, _type))
             return
         if _content.strip() == 'tom mode normal':
             room.mode = 'normal'
             logger.info('切换到normal模式')
             #FIXME 这里似乎无法退订成功
-            frontend.setsockopt(zmq.UNSUBSCRIBE, '')
-            backend.send_json(make_msg(str('notify Tom已切换到normal模式'), _id, _type))
+            backend.send_json(make_msg('notify Tom已切换到normal模式', _id, _type))
             return
 
         #命令模式自动补exec让脚本能够正常处理
@@ -186,13 +176,12 @@ def forwarding():
             else:
                 return
         else:
-            #因为前面退订的bug，需要这么处理
             pattern = re.compile('^{0}'.format(config.name), flags=re.IGNORECASE)
             if pattern.match(_content):
                 _content = pattern.sub('', _content, 1).strip()
             else:
                 return
-            msg = make_msg(_content, _id, _type)
+        msg = make_msg(_content, _id, _type)
         backend.send_json(msg)
         logging.debug('发布消息给scripts: {0}'.format(msg))
 

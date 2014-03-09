@@ -7,4 +7,4 @@ class Notify(Engine):
 
     @respond_handler('notify (.*)')
     def respond(self, message, matches):
-        message.send(matches.group(1).encode('utf-8'))
+        message.send_info(matches.group(1).encode('utf-8'))

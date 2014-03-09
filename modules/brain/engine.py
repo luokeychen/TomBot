@@ -78,14 +78,13 @@ class Message(object):
     def __init__(self, message, socket):
         self.msg = message
         self.content, self.id_, self.type_ = message
-        self.content = self.content
         self.socket = socket
 
     def send(self, content, style=const.DEFAULT_STYLE):
         length = len(content)
         if length > 4096:
-            warn_msg = make_msg('消息过长，只显示部分内容', const.WARNING_STYLE,
-                                self.id_, self.type_)
+            warn_msg = make_msg('消息过长，只显示部分内容',
+                                self.id_, self.type_, const.WARNING_STYLE)
 
             self.socket.send_json(warn_msg)
             content = content[:4096]
@@ -93,16 +92,16 @@ class Message(object):
 
         self.socket.send_json(msg)
 
-        logging.debug('推送消息到adapter: {0}'.format((content, self.id_, self.type_)))
+        logging.info('推送消息到adapter: {0}'.format(msg))
 
     def send_warning(self, content):
-        self.send(content, style=const.WARNING_STYLE)
+        self.send('警告：' + content, style=const.WARNING_STYLE)
 
     def send_error(self, content):
-        self.send(content, style=const.ERROR_STYLE)
+        self.send('错误：' + content, style=const.ERROR_STYLE)
 
     def send_info(self, content):
-        self.send(content, style=const.INFO_STYLE)
+        self.send('提示：' + content, style=const.INFO_STYLE)
 
     def send_code(self, content):
         self.send(content, style=const.CODE_STYLE)
@@ -143,7 +142,7 @@ class Engine(object):
         logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
         for handler in self.respond_handlers:
             try:
-                handler(Message((_content.decode('utf-8'), _id, _type), socket))
+                handler(Message((_content, _id, _type), socket))
             except Exception as e:
                 logger.exception(e)
 

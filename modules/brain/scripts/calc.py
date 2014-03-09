@@ -21,13 +21,13 @@ class Caculator(Engine):
             result = self.calculate(expression)
             message.send(result)
         except OverflowError as e:
-            message.send('数字太大了，我算不出来！')
+            message.send_error('数字太大了，我算不出来！')
         except SyntaxError as e:
-            message.send('这种格式汤姆不能理解！')
+            message.send_error('这种格式汤姆不能理解！')
         except ZeroDivisionError as e:
-            message.send('不要调戏我！')
+            message.send_warning('不要调戏我！')
         except TimeoutException as e:
-            message.send('太复杂了，要花太多时间，不干了。')
+            message.send_error('太复杂了，要花太多时间，不干了。')
     @timeout(1)
     def calculate(self, exp):
         exp = exp.replace(' ', '')

@@ -45,7 +45,6 @@ from engine import Engine, respond_handler
 class SimpleRunner(Engine):
     '''Tom exec command    执行命令'''
     def __init__(self):
-        self.topics = ['exec']
         inventory_file = os.path.split(os.path.realpath(__file__))[0] + '/inventory/hosts.conf'
         self.inventory = ansible.inventory.Inventory(inventory_file)
 
@@ -60,7 +59,7 @@ class SimpleRunner(Engine):
                            'locate', 'ipcs', 'locale', 'lsof', 'lsattr', 'lspci', 'lscpu', 'lspv',
                            'lsvg', 'lslv', 'vgdisplay', 'lvdisplay', 'pvdisplay', 'ps', 'pstree',
                            'ulimit', 'dmesg', 'head', 'tail', 'hostname', 'ifconfig', 'lsblk',
-                           'uname']
+                           'uname', 'cd', 'pwd']
 
         pattern = '*'
 
@@ -81,17 +80,20 @@ class SimpleRunner(Engine):
 
                 for (hostname, result) in results['contacted'].items():
                     if not 'failed' in result:
-                        print "%s >>> %s" % (hostname, result['stdout'])
-                        message.send('[{0}] result==>\n{1}'.format(hostname, result['stdout']))
+                        message.send_info('[{0}] result>>>'.format(hostname))
+                        message.send(result['stdout'])
+                    return
 
                 for (hostname, result) in results['contacted'].items():
                     if 'failed' in result:
-                        print "%s >>> %s" % (hostname, result['msg'])
-                        message.send('{0}, result:\n{1}'.format(hostname, result['msg']))
+                        message.send_info('[{0}] result>>>'.format(hostname))
+                        message.send(result['msg'])
+                    return
 
                 for (hostname, result) in results['dark'].items():
-                    print "%s >>> %s" % (hostname, result)
-                    message.send('{0}, result:\n{1}'.format(hostname, result))
+                    message.send_info('[{0}] result>>>'.format(hostname))
+                    message.send(result)
+                    return
                 return 0
 
         message.send('禁止执行的命令!')
