@@ -21,3 +21,4 @@ class Ping(Engine):
     @respond_handler('\?$')
     def respond(self, message, matches):
         message.send(random.choice(self.greets))
+        return True

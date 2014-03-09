@@ -86,6 +86,7 @@ class SimSimi(Engine):
         t = threading.Thread(target=self.talk, args=(message.content, self.callback))
         t.setDaemon(True)
         t.start()
+        return True
 
     def talk(self, message, callback):
         while True:

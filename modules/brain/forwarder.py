@@ -39,9 +39,7 @@ from __future__ import print_function
 import re
 import logging
 import os
-import sys
 
-import yaml
 import zmq
 import zmq.utils.jsonapi as json
 from zmq.eventloop import zmqstream
@@ -54,31 +52,7 @@ from manager import Room, RoomManager
 
 import const
 
-import types
-sys.modules['config'] = types.ModuleType('config')
 import config
-
-config_file = file('{0}/../../conf/config.yaml'.format(_path))
-
-try:
-    yaml_dict = yaml.load(config_file)
-except Exception:
-    logging.error('配置文件载入错误！')
-    exit(1006)
-config.name = yaml_dict.get('name')
-config.home = yaml_dict.get('home')
-config.ipc_path = yaml_dict.get('ipc_path')
-config.log_level = yaml_dict.get('log_level')
-config.plugins = yaml_dict.get('plugins')
-config.debug = yaml_dict.get('debug')
-config.ansibles = yaml_dict.get('ansibles')
-config.subpub_socket = yaml_dict.get('subpub_socket')
-config.pullpush_socket = yaml_dict.get('pullpush_socket')
-config.use_tcp = yaml_dict.get('use_tcp')
-
-config.use_proxy = yaml_dict.get('use_proxy')
-config.proxy_host = yaml_dict.get('proxy_host')
-config.proxy_port = yaml_dict.get('proxy_port')
 
 logger = logging.getLogger('')
 
@@ -133,7 +107,7 @@ def forwarding():
     frontend.setsockopt(zmq.SUBSCRIBE, '')
 
     if config.use_tcp:
-        frontend.bind(config.subpub_socket)
+        frontend.bind(config.sub_socket)
     else:
         frontend.bind('ipc://{0}/publish.ipc'.format(config.ipc_path))
 
@@ -166,8 +140,8 @@ def forwarding():
         if _content == 'tom mode cmd':
             room.mode = 'command'
             logger.info('切换到command模式')
-            backend.send_json(make_msg('notify Tom已切换到command模式，\
-                                       所有英文开头的指令都将被当作命令执行',
+            backend.send_json(make_msg('notify Tom已切换到command模式，' +
+                                       '所有英文开头的指令都将被当作命令执行',
                                        _id, _type))
             return
         if _content == 'tom mode normal':
@@ -179,8 +153,8 @@ def forwarding():
         if _content == 'tom mode easy':
             room.mode = 'easy'
             logger.info('切换到easy模式')
-            backend.send_json(make_msg('notify Tom已切换到easy模式，\
-                                       指令将不需要Tom前缀，但会忽略中文',
+            backend.send_json(make_msg('notify Tom已切换到easy模式，' +
+                                       '指令将不需要Tom前缀，但会忽略中文',
                                        _id, _type))
             return
 
@@ -192,15 +166,17 @@ def forwarding():
             else:
                 return
         elif room.mode == 'easy':
-            if not re.compile('^[a-z]').match(_content):
+            if not re.compile('^[a-z\?]').match(_content):
                 return
-        else:
+        elif room.mode == 'normal':
             pattern = re.compile('^{0}'.format(config.name),
                                  flags=re.IGNORECASE)
             if pattern.match(_content):
                 _content = pattern.sub('', _content, 1).strip()
             else:
                 return
+        else:
+            logger.warn('无效的房间类型{0}'.format(room.mode))
         msg = make_msg(_content, _id, _type)
         backend.send_json(msg)
         logging.debug('发布消息给scripts: {0}'.format(msg))

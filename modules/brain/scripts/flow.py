@@ -65,6 +65,7 @@ class Flow(Engine):
         cs.close()
         conn.close()
         message.send(result)
+        return True
 
     def check_contain_chinese(self, check_str):
         for ch in check_str:

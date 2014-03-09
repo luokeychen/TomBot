@@ -16,7 +16,7 @@ logger = logging.getLogger('')
 context = zmq.Context()
 push = context.socket(zmq.PUSH)
 if config.use_tcp:
-    push.bind(config.pullpush_socket)
+    push.bind(config.push_socket)
 else:
     push.bind('ipc://{0}/push.ipc'.format(config.ipc_path))
 

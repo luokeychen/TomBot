@@ -8,8 +8,11 @@ log_level: debug
 adapter: qq
 # 用tcp连接或IPC，默认IPC，adapter和服务端没有部署在一起时有用，现在没用
 use_tcp: True
-pullpush_socket: tcp://*:4444
-subpub_socket: tcp://*:4445
+push_socket: tcp://*:4444
+sub_socket: tcp://*:4445
+
+#默认模式：cmd normal easy
+default_mode: easy
 
 # IPC文件的目录
 ipc_path: /home/konglx/project/TomBot/run

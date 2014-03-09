@@ -30,6 +30,7 @@ class Qiubai(Engine):
     def respond(self, message, matches):
         # 如果文件为空则加载内容
         utils.run_in_thread(target=self.send, args=(message,))
+        return True
 
     def send(self, message):
         if not os.stat(qiushi).st_size or not len(self.jokes):

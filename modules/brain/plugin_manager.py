@@ -70,7 +70,10 @@ class PluginManager(object):
                 logger.warn('invalid type')
                 continue
 
-            m = import_module(plugin)
+            try:
+                m = import_module(plugin)
+            except ImportError:
+                logging.error('{0}插件载入失败'.format(plugin))
             for item in dir(m):
                 attr = getattr(m, item)
                 # 载入所有继承了Engine的类

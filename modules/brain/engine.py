@@ -43,7 +43,8 @@ import zmq
 from zmq.eventloop import zmqstream
 import zmq.utils.jsonapi as json
 
-from forwarder import config, make_msg
+from forwarder import make_msg
+import config
 import const
 
 logger = logging.getLogger('')
@@ -139,13 +140,20 @@ class Engine(object):
         _content = msg_body.get('content')
         _type = msg_body.get('type')
 
-        logger.debug('脚本{0}从router收到消息: {1}'.format(self.__class__.__name__, msg_body))
+        class_name = self.__class__.__name__
+
+        logger.debug('{0}从router收到消息: {1}'.format(class_name, msg_body))
+        respond_results = {}
         for handler in self.respond_handlers:
             try:
-                handler(Message((_content, _id, _type), socket))
+                res = handler(Message((_content, _id, _type), socket))
+                respond_results[class_name] = res
             except Exception as e:
+                logger.error('Handler处理失败')
                 logger.exception(e)
                 continue
+
+        logging.info('Handler执行结果：{0}'.format(respond_results))
 
     def run(self, push):
         self.setup_respond_handlers()

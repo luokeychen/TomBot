@@ -28,6 +28,8 @@ class Caculator(Engine):
             message.send_warning('不要调戏我！')
         except TimeoutException as e:
             message.send_error('太复杂了，要花太多时间，不干了。')
+        
+        return True
     @timeout(1)
     def calculate(self, exp):
         exp = exp.replace(' ', '')

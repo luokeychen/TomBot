@@ -20,3 +20,4 @@ class Help(Engine):
     @respond_handler('help')
     def respond(self, message, matches):
         message.send(self.helps)
+        return True
