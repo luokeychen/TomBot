@@ -80,17 +80,19 @@ class SimpleRunner(Engine):
 
                 for (hostname, result) in results['contacted'].items():
                     if not 'failed' in result:
-                        message.send_info('[{0}] result>>>'.format(hostname))
-                        message.send(result['stdout'])
+#                        message.send_info('[{0}] result>>>'.format(hostname))
+#                        message.send(result['stdout'])
+                        message.send('[{0}] result >>> \n{1}'.format(hostname, result['stdout']))
 
                 for (hostname, result) in results['contacted'].items():
                     if 'failed' in result:
-                        message.send_info('[{0}] result>>>'.format(hostname))
-                        message.send(result['msg'])
+#                        message.send_info('[{0}] result>>>'.format(hostname))
+                        message.send('[{0}] result >>> \n{1}'.format(hostname, result['msg']))
 
                 for (hostname, result) in results['dark'].items():
-                    message.send_info('[{0}] result>>>'.format(hostname))
-                    message.send(result)
+#                    message.send_info('[{0}] result>>>'.format(hostname))
+#                    message.send(result)
+                    message.send('[{0}] result >>> \n{1}'.format(hostname, result['msg']))
                 return 0
 
         message.send('禁止执行的命令!')
