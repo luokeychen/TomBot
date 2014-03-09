@@ -20,7 +20,7 @@
 #  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 #   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 #  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 #
@@ -60,7 +60,11 @@ import config
 
 config_file = file('{0}/../../conf/config.yaml'.format(_path))
 
-yaml_dict = yaml.load(config_file)
+try:
+    yaml_dict = yaml.load(config_file)
+except Exception:
+    logging.error('配置文件载入错误！')
+    exit(1006)
 config.name = yaml_dict.get('name')
 config.home = yaml_dict.get('home')
 config.ipc_path = yaml_dict.get('ipc_path')
@@ -141,6 +145,7 @@ def forwarding():
     room_manager = RoomManager()
 
     def callback(msg):
+        # pyzmq的send_json总是发送多帧消息，但只有一帧
         msg_body = json.loads(msg[0])
         _id = msg_body.get('id')
         _content = msg_body.get('content')
@@ -154,18 +159,29 @@ def forwarding():
         else:
             room = room_manager.get_room(_id)
 
+        _content = _content.strip()
+
         logging.debug('从adapter收到消息: {0}'.format(msg_body))
         #模式切换特殊处理
-        if _content.strip() == 'tom mode cmd':
+        if _content == 'tom mode cmd':
             room.mode = 'command'
             logger.info('切换到command模式')
-            backend.send_json(make_msg('notify Tom已切换到command模式', _id, _type))
+            backend.send_json(make_msg('notify Tom已切换到command模式，\
+                                       所有英文开头的指令都将被当作命令执行',
+                                       _id, _type))
             return
-        if _content.strip() == 'tom mode normal':
+        if _content == 'tom mode normal':
             room.mode = 'normal'
             logger.info('切换到normal模式')
-            #FIXME 这里似乎无法退订成功
-            backend.send_json(make_msg('notify Tom已切换到normal模式', _id, _type))
+            backend.send_json(make_msg('notify Tom已切换到normal模式',
+                                       _id, _type))
+            return
+        if _content == 'tom mode easy':
+            room.mode = 'easy'
+            logger.info('切换到easy模式')
+            backend.send_json(make_msg('notify Tom已切换到easy模式，\
+                                       指令将不需要Tom前缀，但会忽略中文',
+                                       _id, _type))
             return
 
         #命令模式自动补exec让脚本能够正常处理
@@ -175,8 +191,12 @@ def forwarding():
                 _content = 'exec ' + _content
             else:
                 return
+        elif room.mode == 'easy':
+            if not re.compile('^[a-z]').match(_content):
+                return
         else:
-            pattern = re.compile('^{0}'.format(config.name), flags=re.IGNORECASE)
+            pattern = re.compile('^{0}'.format(config.name),
+                                 flags=re.IGNORECASE)
             if pattern.match(_content):
                 _content = pattern.sub('', _content, 1).strip()
             else:

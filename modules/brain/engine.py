@@ -20,7 +20,7 @@
 #  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 #   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 #  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 #
@@ -36,7 +36,6 @@
 
 import logging
 import re
-
 import inspect
 import functools
 
@@ -61,7 +60,7 @@ def respond_handler(arg):
         def __handler(*args, **kwargs):
             matches = re.match(regexp, args[1].content)
             if matches:
-#                print('匹配到正则表达式: {0}'.format(matches.string))
+                logger.info(u'匹配到正则表达式: {0}'.format(matches.string))
                 return func(args[0], args[1], matches)
             else:
                 return None
@@ -95,13 +94,13 @@ class Message(object):
         logging.info('推送消息到adapter: {0}'.format(msg))
 
     def send_warning(self, content):
-        self.send('警告：' + content, style=const.WARNING_STYLE)
+        self.send(content, style=const.WARNING_STYLE)
 
     def send_error(self, content):
-        self.send('错误：' + content, style=const.ERROR_STYLE)
+        self.send(content, style=const.ERROR_STYLE)
 
     def send_info(self, content):
-        self.send('提示：' + content, style=const.INFO_STYLE)
+        self.send(content, style=const.INFO_STYLE)
 
     def send_code(self, content):
         self.send(content, style=const.CODE_STYLE)
@@ -119,7 +118,8 @@ class Engine(object):
         '''
         respond_handlers = []
         for _, handler in inspect.getmembers(self, callable):
-            # FIXME 这里用装饰过的函数名来判断被装饰过的函数列表，所以自己定义的任何callable对象，不能命名为__handler
+            # FIXME 这里用装饰过的函数名来判断被装饰过的函数列表，
+            # 所以自己定义的任何callable对象，不能命名为__handler
             if handler.__name__ == '__handler':
                 if handler not in respond_handlers:
                     respond_handlers.append(handler)
@@ -139,17 +139,18 @@ class Engine(object):
         _content = msg_body.get('content')
         _type = msg_body.get('type')
 
-        logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
+        logger.debug('脚本{0}从router收到消息: {1}'.format(self.__class__.__name__, msg_body))
         for handler in self.respond_handlers:
             try:
                 handler(Message((_content, _id, _type), socket))
             except Exception as e:
                 logger.exception(e)
+                continue
 
     def run(self, push):
         self.setup_respond_handlers()
         # context 必须在run方法里创建
-        # http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
+        #http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
         context = zmq.Context(1)
 
         subscriber = context.socket(zmq.SUB)

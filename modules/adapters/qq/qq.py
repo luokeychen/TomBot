@@ -10,41 +10,158 @@
     usage:
         python qq.py [qq] [password]
 '''
-import geventhttpclient.httplib
-geventhttpclient.httplib.patch()
 import logging
 import zmq
 import json
+import smtplib
 from zmq.eventloop import zmqstream, ioloop
+ioloop.install()
+import yaml
 
 import sys
 import os
+import traceback
+
 sys.path.append('./twqq')
 from twqq.client import WebQQClient
 from twqq.requests import system_message_handler, group_message_handler, discu_message_handler
 from twqq.requests import buddy_message_handler, kick_message_handler, register_request_handler, PollMessageRequest
+from twqq.requests import FriendInfoRequest, BeforeLoginRequest, Login2Request
 
+from server import http_server_run
+
+from email.mime.text import MIMEText
 
 logger = logging.getLogger('client')
-ioloop.install()
+
+fp = file('config.yaml')
+config = yaml.load(fp)
+
+pub_socket = config.get('pub_socket')
+pull_socket = config.get('pull_socket')
+
+SMTP_HOST = config.get('smtp_host')
+SMTP_ACCOUNT = config.get('smtp_account')
+HTTP_HOST = config['verify'].get('http_host')
+HTTP_PORT = config['verify'].get('http_port')
+EMAIL = config['verify'].get('email')
+
+use_proxy = config.get('use_proxy')
+proxy_host = config.get('proxy_host')
+proxy_port = config.get('proxy_port')
 
 context = zmq.Context(1)
 pub = context.socket(zmq.PUB)
 _home = os.getenv('TOMBOT_HOME')
-# pub.connect('ipc://{0}/run/publish.ipc'.format(_home))
-pub.connect('tcp://192.168.3.107:4445')
+pub.connect(pub_socket)
 pull = context.socket(zmq.PULL)
-# pull.connect('ipc://{0}/run/push.ipc'.format(_home))
-pull.connect('tcp://192.168.3.107:4444')
+pull.connect(pull_socket)
+
+
+def send_notice_email():
+    """ 发送提醒邮件
+    """
+    if not SMTP_HOST:
+        return False
+
+    postfix = ".".join(SMTP_HOST.split(".")[1:])
+    me = "bot<{0}@{1}>".format(SMTP_ACCOUNT, postfix)
+
+    msg = MIMEText(""" 你的WebQQ机器人需要一个验证码,
+                   请打开你的服务器输入验证码:
+                   http://{0}:{1}""".format(HTTP_HOST,
+                                            HTTP_PORT),
+                   _subtype="plain", _charset="utf-8")
+    msg['Subject'] = u"WebQQ机器人需要验证码"
+    msg["From"] = me
+    msg['To'] = EMAIL
+    try:
+        server = smtplib.SMTP()
+        server.connect(SMTP_HOST)
+        server.login(config.SMTP_ACCOUNT, config.SMTP_PASSWORD)
+        server.sendmail(me, [config.EMAIL], msg.as_string())
+        server.close()
+        return True
+
+    except Exception as e:
+        traceback.print_exc()
+        return False
 
 
 class Client(WebQQClient):
     def handle_verify_code(self, path, r, uin):
-        logger.info(u'验证码本地路径为: {0}'.format(path))
-        check_code = None
-        while not check_code:
-            check_code = raw_input(u'输入验证码: ')
-        self.enter_verify_code(check_code, r, uin)
+        self.verify_img_path = path
+
+        logger.info(u"正在上传验证码...")
+        res = self.hub.upload_file("check.jpg", self.hub.checkimg_path)
+        logger.info(u"验证码已上传, 地址为: {0}".format(res.read()))
+
+        if hasattr(self, "handler") and self.handler:
+            self.handler.r = r
+            self.handler.uin = uin
+
+        # FIXME config support
+        logger.info("请打开 http://{0}:{1} 输入验证码"
+                    .format(HTTP_HOST, HTTP_PORT))
+        if send_notice_email():
+            logger.info("发送通知邮件成功")
+        else:
+            logger.warning("发送通知邮件失败")
+            logger.info(u"验证码本地路径为: {0}".format(self.hub.checkimg_path))
+            check_code = None
+            while not check_code:
+                check_code = raw_input("输入验证码: ")
+            self.enter_verify_code(check_code, r, uin)
+
+    def enter_verify_code(self, code, r, uin, callback=None):
+        super(Client, self).enter_verify_code(code, r, uin)
+        self.verify_callback = callback
+        self.verify_callback_called = False
+
+    @register_request_handler(BeforeLoginRequest)
+    def handle_verify_check(self, request, resp, data):
+        if not data:
+            self.handle_verify_callback(False, "没有数据返回验证失败, 尝试重新登录")
+            return
+
+        args = request.get_back_args(data)
+        scode = int(args[0])
+        if scode != 0:
+            self.handle_verify_callback(False, args[4])
+
+    def handle_verify_callback(self, status, msg=None):
+        if hasattr(self, "verify_callback") and callable(self.verify_callback)\
+           and not self.verify_callback_called:
+            self.verify_callback(status, msg)
+            self.verify_callback_called = True
+
+    @register_request_handler(Login2Request)
+    def handle_login_errorcode(self, request, resp, data):
+        if not resp.body:
+            return self.handle_verify_callback(False, u"没有数据返回, 尝试重新登录")
+
+        if data.get("retcode") != 0:
+            return self.handle_verify_callback(False, u"登录失败: {0}"
+                                               .format(data.get("retcode")))
+
+    @register_request_handler(FriendInfoRequest)
+    def handle_frind_info_erro(self, request, resp, data):
+        if not resp.body:
+            self.handle_verify_callback(False, u"获取好友列表失败")
+            return
+
+        if data.get("retcode") != 0:
+            self.handle_verify_callback(False, u"好友列表获取失败: {0}"
+                                        .format(data.get("retcode")))
+            return
+        self.handle_verify_callback(True)
+
+#    def handle_verify_code(self, path, r, uin):
+#        logger.info(u'验证码本地路径为: {0}'.format(path))
+#        check_code = None
+#        while not check_code:
+#            check_code = raw_input(u'输入验证码: ')
+#        self.enter_verify_code(check_code, r, uin)
 
     @system_message_handler
     def handle_friend_add(self, mtype, from_uin, account, message):
@@ -86,6 +203,9 @@ class Client(WebQQClient):
         if data and data.get("retcode") in [103]:  # 103重新登陆不成功, 暂时退出
             logger.error(u"获取登出消息 {0!r}".format(data))
             exit()
+    def run(self, handler=None):
+        self.handler = handler
+        super(Client, self).run()
 
 
 if __name__ == '__main__':
@@ -95,9 +215,13 @@ if __name__ == '__main__':
     tornado.log.enable_pretty_logging()
 
     webqq = Client(int(sys.argv[1]), sys.argv[2])
-    webqq.hub.http.fetch_kwargs = {}
+    if use_proxy:
+        webqq.hub.http.set_proxy(proxy_host, proxy_port)
 
     def zmq_handler(msg):
+        if msg == ['\x01']:
+            return
+        logger.info(msg)
         msg_body = json.loads(msg[0])
         logger.info('adapter收到消息：{0}'.format(msg_body))
         _content = msg_body.get('content')
@@ -119,6 +243,6 @@ if __name__ == '__main__':
     stream.on_recv(zmq_handler)
 
 try:
-    webqq.run()
+    http_server_run(webqq)
 except KeyboardInterrupt:
     logger.info("收到退出信号，程序退出...")
