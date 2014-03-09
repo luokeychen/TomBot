@@ -42,8 +42,10 @@ import functools
 
 import zmq
 from zmq.eventloop import zmqstream
-from forwarder import config
+import zmq.utils.jsonapi as json
 
+from forwarder import config, make_msg
+import const
 
 logger = logging.getLogger('')
 
@@ -75,17 +77,35 @@ class Message(object):
     '''
     def __init__(self, message, socket):
         self.msg = message
-        self.content, self.id, self.type = message
+        self.content, self.id_, self.type_ = message
         self.content = self.content
         self.socket = socket
 
-    def send(self, content):
+    def send(self, content, style=const.DEFAULT_STYLE):
         length = len(content)
         if length > 4096:
-            self.socket.send_multipart(['消息过长，只显示部分内容', self.id, self.type])
+            warn_msg = make_msg('消息过长，只显示部分内容', const.WARNING_STYLE,
+                                self.id_, self.type_)
+
+            self.socket.send_json(warn_msg)
             content = content[:4096]
-        self.socket.send_multipart([content, self.id, self.type])
-        logging.debug('推送消息到adapter: {0}'.format((content, self.id, self.type)))
+        msg = make_msg(content, self.id_, self.type_, style)
+
+        self.socket.send_json(msg)
+
+        logging.debug('推送消息到adapter: {0}'.format((content, self.id_, self.type_)))
+
+    def send_warning(self, content):
+        self.send(content, style=const.WARNING_STYLE)
+
+    def send_error(self, content):
+        self.send(content, style=const.ERROR_STYLE)
+
+    def send_info(self, content):
+        self.send(content, style=const.INFO_STYLE)
+
+    def send_code(self, content):
+        self.send(content, style=const.CODE_STYLE)
 
 
 class Engine(object):
@@ -93,8 +113,6 @@ class Engine(object):
     插件应继承此类, 并定制topics
 
     '''
-
-    topics = []
 
     def setup_respond_handlers(self):
         '''
@@ -117,7 +135,11 @@ class Engine(object):
 
         :param socket: 一个socket连接，pull模式
         '''
-        [_content, _id, _type] = msg
+        msg_body = json.loads(msg[0])
+        _id = msg_body.get('id')
+        _content = msg_body.get('content')
+        _type = msg_body.get('type')
+
         logger.debug('从router收到消息: {0}'.format((_content, _id, _type)))
         for handler in self.respond_handlers:
             try:
@@ -134,8 +156,7 @@ class Engine(object):
         subscriber = context.socket(zmq.SUB)
         subscriber.connect('ipc://{0}/route.ipc'.format(config.ipc_path))
 
-        for topic in self.topics:
-            subscriber.setsockopt(zmq.SUBSCRIBE, topic)
+        subscriber.setsockopt(zmq.SUBSCRIBE, '')
 
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
         stream = zmqstream.ZMQStream(subscriber)

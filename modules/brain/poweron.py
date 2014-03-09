@@ -4,7 +4,7 @@ import os
 
 from forwarder import init_logger, forwarding
 from forwarder import config
-from plugin_manager import load_scripts
+from plugin_manager import PluginManager
 
 import zmq
 
@@ -20,11 +20,13 @@ if config.use_tcp:
 else:
     push.bind('ipc://{0}/push.ipc'.format(config.ipc_path))
 
+
 def run():
     logger = init_logger()
     logger.info('开始载入脚本...')
-    load_scripts('scripts', push)
-    load_scripts('ansible', push)
+    pluginmanager = PluginManager()
+    pluginmanager.load_scripts('plugin', push)
+    pluginmanager.load_scripts('ansible', push)
     logger.info('脚本载入完成')
     logger.info('forwarder 准备开始监听')
     forwarding()

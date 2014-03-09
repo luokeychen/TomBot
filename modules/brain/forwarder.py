@@ -43,6 +43,7 @@ import sys
 
 import yaml
 import zmq
+import zmq.utils.jsonapi as json
 from zmq.eventloop import zmqstream
 from zmq.eventloop import ioloop
 ioloop.install()
@@ -50,6 +51,8 @@ ioloop.install()
 _path = os.path.abspath(os.path.dirname(__file__))
 
 from manager import Room, RoomManager
+
+import const
 
 import types
 sys.modules['config'] = types.ModuleType('config')
@@ -74,6 +77,14 @@ config.proxy_host = yaml_dict.get('proxy_host')
 config.proxy_port = yaml_dict.get('proxy_port')
 
 logger = logging.getLogger('')
+
+
+def make_msg(content, id_=None, type_=None, style=const.DEFAULT_STYLE):
+    msg = {'content': content,
+           'style': style,
+           'id': id_,
+           'type': type_}
+    return msg
 
 
 def init_logger():
@@ -120,6 +131,8 @@ def forwarding():
                config.name.capitalize()]
     # 订阅以机器人名字开头的消息，包括小写、大写、首字母大写
 
+    frontend.setsockopt(zmq.SUBSCRIBE, '')
+
     for _filter in filters:
         frontend.setsockopt(zmq.SUBSCRIBE, _filter)
 
@@ -136,29 +149,33 @@ def forwarding():
     room_manager = RoomManager()
 
     def callback(msg):
-        [_content, _id, _type] = msg
+        msg_body = json.loads(msg[0])
+        _id = msg_body.get('id')
+        _content = msg_body.get('content')
+        _type = msg_body.get('type')
 
         #若该房间不在字典中，则添加一个
         if not room_manager.get_room(_id):
             room = Room(_id)
             room_manager.add_room(room)
+            room.rtype = _type
         else:
             room = room_manager.get_room(_id)
 
-        logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
+        logging.debug('从adapter收到消息: {0}'.format(msg_body))
         #模式切换特殊处理
         if _content.strip() == 'tom mode cmd':
             room.mode = 'command'
             logger.info('切换到command模式')
             frontend.setsockopt(zmq.SUBSCRIBE, '')
-            backend.send_multipart([str('notify Tom已切换到command模式'), _id, _type])
+            backend.send_json(make_msg(str('notify Tom已切换到command模式'), _id, _type))
             return
         if _content.strip() == 'tom mode normal':
             room.mode = 'normal'
             logger.info('切换到normal模式')
             #FIXME 这里似乎无法退订成功
             frontend.setsockopt(zmq.UNSUBSCRIBE, '')
-            backend.send_multipart([str('notify Tom已切换到normal模式'), _id, _type])
+            backend.send_json(make_msg(str('notify Tom已切换到normal模式'), _id, _type))
             return
 
         #命令模式自动补exec让脚本能够正常处理
@@ -175,8 +192,9 @@ def forwarding():
                 _content = pattern.sub('', _content, 1).strip()
             else:
                 return
-        backend.send_multipart([_content, _id, _type])
-        logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
+            msg = make_msg(_content, _id, _type)
+        backend.send_json(msg)
+        logging.debug('发布消息给scripts: {0}'.format(msg))
 
     stream = zmqstream.ZMQStream(frontend)
     stream.on_recv(callback)

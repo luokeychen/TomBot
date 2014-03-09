@@ -5,7 +5,6 @@ from __future__ import print_function
 from math import *
 
 import re
-import zmq
 
 from engine import Engine
 from engine import respond_handler
@@ -14,12 +13,10 @@ from utils import timeout, TimeoutException
 
 class Caculator(Engine):
     '''Tom calc 表达式\t 例如：tom calc 123^22/444+123.可以做位运算：tom calc 1<<3|&11|~123'''
-    def __init__(self):
-        self.topics = ['calc']
 
     @respond_handler('calc (.*)$')
     def respond(self, message, matches):
-        expression= matches.group(1).encode('utf-8')
+        expression = matches.group(1).encode('utf-8')
         try:
             result = self.calculate(expression)
             message.send(result)

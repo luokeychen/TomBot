@@ -24,7 +24,6 @@ class Qiubai(Engine):
     '''Tom make me laugh\t 发送一则笑话（来自糗百）'''
 
     def __init__(self):
-        self.topics = ['make']
         self.jokes = []
 
     @respond_handler('make me laugh$')

@@ -74,7 +74,6 @@ class SimSimiTalk(object):
 
 class SimSimi(Engine):
     '''tom 中文, 智能回答（来自simsimi）'''
-    topics = ['']
     simsimi = SimSimiTalk()
     message = None
 

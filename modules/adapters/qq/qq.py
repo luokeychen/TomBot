@@ -14,6 +14,7 @@ import geventhttpclient.httplib
 geventhttpclient.httplib.patch()
 import logging
 import zmq
+import json
 from zmq.eventloop import zmqstream, ioloop
 
 import sys
@@ -52,16 +53,25 @@ class Client(WebQQClient):
 
     @discu_message_handler
     def handle_discu_message(self, did, from_uin, content, source):
-        pub.send_multipart([content.encode('utf-8'), str(did), 'discu'])
+        msg = {'content': content.encode('utf-8'),
+               'id': str(did),
+               'type': 'discu'}
+        pub.send_json(msg)
 
     @group_message_handler
     def handle_group_message(self, member_nick, content, group_code,
                              send_uin, source):
-        pub.send_multipart([content.encode('utf-8'), str(group_code), 'group'])
+        msg = {'content': content.encode('utf-8'),
+               'id': str(group_code),
+               'type': 'group'}
+        pub.send_json(msg)
 
     @buddy_message_handler
     def handle_buddy_message(self, from_uin, content, source):
-        pub.send_multipart([content.encode('utf-8'), str(from_uin), 'buddy'])
+        msg = {'content': content.encode('utf-8'),
+               'id': str(from_uin),
+               'type': 'buddy'}
+        pub.send_json(msg)
 
     @kick_message_handler
     def handle_kick(self, message):
@@ -85,16 +95,23 @@ if __name__ == '__main__':
     tornado.log.enable_pretty_logging()
 
     webqq = Client(int(sys.argv[1]), sys.argv[2])
+    webqq.hub.http.fetch_kwargs = {}
 
     def zmq_handler(msg):
-        _content, _id,  _type = msg
-        _content = _content.decode('utf-8')
+        msg_body = json.loads(msg[0])
+        logger.info('adapter收到消息：{0}'.format(msg_body))
+        _content = msg_body.get('content')
+        _id = msg_body.get('id')
+        _style = msg_body.get('style')
+        _type = msg_body.get('type')
+
+#        _content = _content.decode('utf-8')
         if _type == 'buddy':
-            webqq.hub.send_buddy_msg(int(_id), _content)
+            webqq.hub.send_buddy_msg(int(_id), _content, _style)
         elif _type == 'group':
-            webqq.hub.send_group_msg(int(_id), _content)
+            webqq.hub.send_group_msg(int(_id), _content, _style)
         elif _type == 'discu':
-            webqq.hub.send_discu_msg(int(_id), _content)
+            webqq.hub.send_discu_msg(int(_id), _content, _style)
         else:
             logger.error('zmq message format error')
 
