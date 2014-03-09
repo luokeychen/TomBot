@@ -34,29 +34,22 @@
 #  Date        : 2014-02-09
 #  Description : forwarder for TomBot
 
-    
 from __future__ import print_function
 
 import re
-import imp
 import logging
 import os
 import sys
-
-from inspect import isclass, getfile
 
 import yaml
 import zmq
 from zmq.eventloop import zmqstream
 from zmq.eventloop import ioloop
 ioloop.install()
-# import zmq.green as zmq
-# import gevent
-from threading import Thread
 
 _path = os.path.abspath(os.path.dirname(__file__))
 
-from user_manager import Room, RoomManager
+from manager import Room, RoomManager
 
 import types
 sys.modules['config'] = types.ModuleType('config')
@@ -72,10 +65,13 @@ config.log_level = yaml_dict.get('log_level')
 config.plugins = yaml_dict.get('plugins')
 config.debug = yaml_dict.get('debug')
 config.ansibles = yaml_dict.get('ansibles')
-config.command_prefix = yaml_dict.get('command_prefix')
 config.subpub_socket = yaml_dict.get('subpub_socket')
 config.pullpush_socket = yaml_dict.get('pullpush_socket')
 config.use_tcp = yaml_dict.get('use_tcp')
+
+config.use_proxy = yaml_dict.get('use_proxy')
+config.proxy_host = yaml_dict.get('proxy_host')
+config.proxy_port = yaml_dict.get('proxy_port')
 
 logger = logging.getLogger('')
 
@@ -84,18 +80,15 @@ def init_logger():
     '''初始化logger
     '''
     import tornado.log
+    from tornado.options import options
 
-    tornado.log.enable_pretty_logging()
-
-    # fmt = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
-
-    # ch = logging.StreamHandler()
-    # ch.setFormatter(fmt)
-
-    # fh = logging.FileHandler('{0}/log/tom.log'.format(config.home))
-    # fh.setFormatter(fmt)
-
-    # logger.addHandler(fh)
+    if not config.debug:
+        options.log_file_prefix = '{0}/log/tom.log'.format(config.home)
+        options.log_file_max_size = 5 * 1024 * 1024
+        options.log_file_num_backups = 5
+        tornado.log.enable_pretty_logging(options)
+    else:
+        tornado.log.enable_pretty_logging()
 
     if config.log_level == 'debug':
         logger.setLevel(logging.DEBUG)
@@ -109,62 +102,7 @@ def init_logger():
         logger.setLevel(logging.CRITICAL)
     else:
         logging.error('错误的日志级别，请设置成debug, info, warning, error, critical中的一个')
-
-
-    # if config.debug:
-    #     logger.addHandler(ch)
-    #     logger.setLevel(logging.DEBUG)
     return logger
-
-context = zmq.Context()
-push = context.socket(zmq.PUSH)
-if config.use_tcp:
-    push.bind(config.pullpush_socket)
-else:
-    push.bind('ipc://{0}/push.ipc'.format(config.ipc_path))
-
-
-def load_scripts():
-    '''载入插件
-    '''
-
-    for plugin in config.plugins:
-        m = imp.load_source(plugin, '{0}/scripts/{1}.py'.format(_path, plugin))
-        for item in dir(m):
-            attr = getattr(m, item)
-            if isclass(attr) and plugin in getfile(attr):
-                if hasattr(attr, 'run'):
-                    _instance = attr()
-                    logger.info('正在实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
-                    try:
-#                            p = Process(target=_instance.run, args=(push,))
-                            p = Thread(target=_instance.run, args=(push,))
-                            p.daemon = False
-                    except AttributeError as e:
-                        logger.warn('脚本载入失败，错误信息：{0}'.format(e))
-                        continue
-                    p.start()
-
-
-def load_runners():
-    '''载入ansible脚本
-    '''
-    for ansible in config.ansibles:
-        m = imp.load_source(ansible, '{0}/../ansible/{1}.py'.format(_path, ansible))
-        for item in dir(m):
-            attr = getattr(m, item)
-            if isclass(attr) and ansible in getfile(attr):
-                if hasattr(attr, 'run'):
-                    _instance = attr()
-                    logger.info('正在实例化ansible脚本{0}的{1}类...'.format(ansible, attr.__name__))
-                    try:
-#                            p = Process(target=_instance.run, args=(push,))
-                            p = Thread(target=_instance.run, args=(push,))
-                            p.daemon = False
-                    except AttributeError as e:
-                        logger.warn('ansible脚本载入失败，错误信息：{0}'.format(e))
-                        continue
-                    p.start()
 
 
 def forwarding():
@@ -208,25 +146,35 @@ def forwarding():
             room = room_manager.get_room(_id)
 
         logging.debug('从adapter收到消息: {0}'.format((_content, _id, _type)))
+        #模式切换特殊处理
         if _content.strip() == 'tom mode cmd':
             room.mode = 'command'
             logger.info('切换到command模式')
-            backend.send_multipart([str('notify Tom已切换到command模式'), _id, _type])
             frontend.setsockopt(zmq.SUBSCRIBE, '')
+            backend.send_multipart([str('notify Tom已切换到command模式'), _id, _type])
             return
         if _content.strip() == 'tom mode normal':
             room.mode = 'normal'
             logger.info('切换到normal模式')
-            backend.send_multipart([str('notify Tom已切换到normal模式'), _id, _type])
+            #FIXME 这里似乎无法退订成功
             frontend.setsockopt(zmq.UNSUBSCRIBE, '')
+            backend.send_multipart([str('notify Tom已切换到normal模式'), _id, _type])
             return
 
+        #命令模式自动补exec让脚本能够正常处理
         if room.mode == 'command':
+            #非英文开头直接忽略
             if re.compile('^[a-z]').match(_content):
                 _content = 'exec ' + _content
+            else:
+                return
         else:
+            #因为前面退订的bug，需要这么处理
             pattern = re.compile('^{0}'.format(config.name), flags=re.IGNORECASE)
-            _content = pattern.sub('', _content, 1).strip()
+            if pattern.match(_content):
+                _content = pattern.sub('', _content, 1).strip()
+            else:
+                return
         backend.send_multipart([_content, _id, _type])
         logging.debug('发布消息给scripts: {0}'.format((_content, _id, _type)))
 

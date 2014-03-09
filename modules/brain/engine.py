@@ -34,8 +34,6 @@
 #  Date        : 2014-02-09
 #  Description : engine for TomBot
 
-import sys
-    
 import logging
 import re
 
@@ -82,6 +80,10 @@ class Message(object):
         self.socket = socket
 
     def send(self, content):
+        length = len(content)
+        if length > 4096:
+            self.socket.send_multipart(['消息过长，只显示部分内容', self.id, self.type])
+            content = content[:4096]
         self.socket.send_multipart([content, self.id, self.type])
         logging.debug('推送消息到adapter: {0}'.format((content, self.id, self.type)))
 
