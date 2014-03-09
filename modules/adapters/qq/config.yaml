@@ -1,0 +1,18 @@
+pull_socket: tcp://192.168.3.107:4444
+pub_socket: tcp://192.168.3.107:4445
+
+use_proxy: False
+proxy_host: 192.168.13.19
+proxy_port: 7777
+
+log_level: info
+
+smtp_host: mail.ffcs.cn
+smtp_port: 110
+smtp_account: konglx
+
+verify: {
+    http_host: 192.168.3.107,
+    http_port: 8000,
+    email: konglx@ffcs.cn
+}
