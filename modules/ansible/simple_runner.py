@@ -59,7 +59,7 @@ class SimpleRunner(Engine):
                            'locate', 'ipcs', 'locale', 'lsof', 'lsattr', 'lspci', 'lscpu', 'lspv',
                            'lsvg', 'lslv', 'vgdisplay', 'lvdisplay', 'pvdisplay', 'ps', 'pstree',
                            'ulimit', 'dmesg', 'head', 'tail', 'hostname', 'ifconfig', 'lsblk',
-                           'uname', 'cd', 'pwd']
+                           'uname', 'cd', 'pwd', 'java']
 
         pattern = '*'
 

@@ -42,6 +42,7 @@ pull_socket = config.get('pull_socket')
 
 SMTP_HOST = config.get('smtp_host')
 SMTP_ACCOUNT = config.get('smtp_account')
+SMTP_PASSWORD = config.get('smtp_password')
 HTTP_HOST = config['verify'].get('http_host')
 HTTP_PORT = config['verify'].get('http_port')
 EMAIL = config['verify'].get('email')
@@ -78,8 +79,8 @@ def send_notice_email():
     try:
         server = smtplib.SMTP()
         server.connect(SMTP_HOST)
-        server.login(config.SMTP_ACCOUNT, config.SMTP_PASSWORD)
-        server.sendmail(me, [config.EMAIL], msg.as_string())
+        server.login(SMTP_ACCOUNT, SMTP_PASSWORD)
+        server.sendmail(me, [EMAIL], msg.as_string())
         server.close()
         return True
 
@@ -91,10 +92,6 @@ def send_notice_email():
 class Client(WebQQClient):
     def handle_verify_code(self, path, r, uin):
         self.verify_img_path = path
-
-        logger.info(u"正在上传验证码...")
-        res = self.hub.upload_file("check.jpg", self.hub.checkimg_path)
-        logger.info(u"验证码已上传, 地址为: {0}".format(res.read()))
 
         if hasattr(self, "handler") and self.handler:
             self.handler.r = r

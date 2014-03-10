@@ -72,8 +72,8 @@ class PluginManager(object):
 
             try:
                 m = import_module(plugin)
-            except ImportError:
-                logging.error('{0}插件载入失败'.format(plugin))
+            except ImportError as e:
+                logging.error('{0}插件载入失败，错误信息：{1}'.format(plugin, e))
             for item in dir(m):
                 attr = getattr(m, item)
                 # 载入所有继承了Engine的类

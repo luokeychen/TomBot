@@ -24,11 +24,12 @@
 import os
 import time
 import logging
+import yaml
 from tornado.web import RequestHandler, Application, asynchronous
 
 HTTP_LISTEN = "*"
-
-HTTP_PORT = 8000
+config = yaml.load(file('config.yaml'))
+HTTP_PORT = config['verify'].get('http_port')
 
 logger = logging.getLogger()
 
