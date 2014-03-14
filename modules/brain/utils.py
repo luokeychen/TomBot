@@ -20,7 +20,7 @@
 #  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 #   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 #  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 #
@@ -34,8 +34,10 @@
 #  Date        : 2014-02-09
 #  Description : some useful code
 
-    
 import threading
+
+import const
+import config
 """
 Code to timeout with processes.
 
@@ -78,7 +80,9 @@ class RunableProcessing(multiprocessing.Process):
     def __init__(self, func, *args, **kwargs):
         self.queue = multiprocessing.Queue(maxsize=1)
         args = (func,) + args
-        multiprocessing.Process.__init__(self, target=self.run_func, args=args, kwargs=kwargs)
+        multiprocessing.Process.__init__(self, target=self.run_func,
+                                         args=args,
+                                         kwargs=kwargs)
 
     def run_func(self, func, *args, **kwargs):
         try:
@@ -126,5 +130,49 @@ def run_in_thread(target=None, args=()):
     t.daemon = True
     t.start()
 
+
 def gbk2utf8(string):
     return string.decode('GBK').encode('UTF-8')
+
+
+def make_msg(retcode, content, id_=None, type_=None,
+             style=const.DEFAULT_STYLE):
+
+    msg = {'retcode': retcode,
+           'content': content,
+           'style': style,
+           'id': id_,
+           'type': type_}
+    return msg
+
+
+logger = logging.getLogger('')
+
+
+def init_logger():
+    '''初始化logger
+    '''
+    import tornado.log
+    from tornado.options import options
+
+    if not config.debug:
+        options.log_file_prefix = '{0}/log/tom.log'.format(config.home)
+        options.log_file_max_size = 5 * 1024 * 1024
+        options.log_file_num_backups = 5
+        tornado.log.enable_pretty_logging(options)
+    else:
+        tornado.log.enable_pretty_logging()
+
+    if config.log_level == 'debug':
+        logger.setLevel(logging.DEBUG)
+    elif config.log_level == 'info':
+        logger.setLevel(logging.INFO)
+    elif config.log_level == 'warn':
+        logger.setLevel(logging.WARN)
+    elif config.log_level == 'error':
+        logger.setLevel(logging.ERROR)
+    elif config.log_level == 'critical':
+        logger.setLevel(logging.CRITICAL)
+    else:
+        logging.error('错误的日志级别，请设置成debug, info, warning, error, critical中的一个')
+    return logger

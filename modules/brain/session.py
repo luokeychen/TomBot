@@ -28,47 +28,58 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : config.py
+#  File        : user_manager.py
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
-#  Date        : 2014-02-09
-#  Description : configurations
+#  Date        : 2014-03-08
+#  Description : user and room management
+
+from collections import deque
+
+import config
 
 
-import os
-import yaml
+class User(object):
+    '''用户'''
+    def __init__(self, user_id):
+        self.uid = user_id
+        self.permission = {"base": True}
+        self.isadmin = False
+        #历史记录最大100条
+        self.history = deque(maxlen=10)
 
-home = os.getenv('TOMBOT_HOME')
 
-if not home:
-    print('未配置TOMBOT_HOME环境变量，程序退出。')
-    exit(1003)
+class Room(object):
+    def __init__(self, room_id):
+        self.rid = room_id
+        self.rtype = None
+        self.mode = config.default_mode
+        self.users = []
 
-# _path = os.path.abspath(os.path.dirname(__file__))
-config_file = file('{0}/conf/config.yaml'.format(home))
 
-try:
-    yaml_dict = yaml.load(config_file)
-except Exception as e:
-    print('配置文件载入错误:{0}'.format(e))
-    exit(1006)
-name = yaml_dict.get('name')
-home = yaml_dict.get('home')
+class RoomManager(object):
+    def __init__(self):
+        #{id: Room Object}
+        self.rooms = {}
 
-log_level = yaml_dict['backend'].get('log_level')
-plugins = yaml_dict.get('plugins')
-debug = yaml_dict['backend'].get('debug')
-ansibles = yaml_dict.get('ansibles')
+    def get_room(self, room_id):
+        return self.rooms.get(room_id)
 
-ipc_path = yaml_dict['backend'].get('ipc_path')
-server_socket = yaml_dict['backend'].get('server_socket')
-use_tcp = yaml_dict['backend'].get('use_tcp')
+    def add_room(self, roomobj):
+        self.rooms[roomobj.rid] = roomobj
 
-use_proxy = yaml_dict.get('use_proxy')
-proxy_host = yaml_dict.get('proxy_host')
-proxy_port = yaml_dict.get('proxy_port')
 
-default_mode = yaml_dict['backend'].get('default_mode')
+class UserManager(object):
+    '''用户管理器，储存所有用户信息'''
+    users = {}
 
-backend_count = yaml_dict['backend'].get('workers')
-capture = yaml_dict['broker'].get('capture')
+    def load_from_json(self, fp):
+        '''从json载入用户属性'''
+        '''
+        {"id":123, {"permission", {"base":1, "script1": 1, "script2":0}}}
+        '''
+        pass
+
+    def load_from_db(self):
+        '''从redis载入用户属性'''
+        pass

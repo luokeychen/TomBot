@@ -6,13 +6,6 @@ from engine import Engine, respond_handler
 class Template(Engine):
     '''用法描述'''
     def __init__(self):
-        '''订阅的消息过滤器，以此字符串开头的消息，才会传入到这个脚本
-        必须添加至少一个topic，否则收不到消息,这也是zeromq的限制，如果topic中有空字符串，那么会收到所有消息
-        最好根据实际情况定义， 以减少收到消息的量，
-        在处理量大的时候，会有用
-        可以添加多个topic，没有限制
-        '''
-        self.topics[ 'template' ]
 
         # 其他初始化
 

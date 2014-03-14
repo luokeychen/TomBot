@@ -37,13 +37,12 @@
 import logging
 import re
 import inspect
-import functools
 
 import zmq
 from zmq.eventloop import zmqstream
 import zmq.utils.jsonapi as json
 
-from forwarder import make_msg
+from utils import make_msg
 import config
 import const
 
@@ -64,6 +63,7 @@ def respond_handler(arg):
                 logger.info(u'匹配到正则表达式: {0}'.format(matches.string))
                 return func(args[0], args[1], matches)
             else:
+                logger.info(u'消息被丢弃: {0}'.format(args[1].content))
                 return None
         return __handler
     return wrapper
@@ -75,35 +75,39 @@ class Message(object):
     :param message: 消息tuple
     :param socket: pull模式的zmq socket
     '''
+
+    #retcode: 0 normal 101 warn 102 error 1001 null
     def __init__(self, message, socket):
         self.msg = message
-        self.content, self.id_, self.type_ = message
+        self.identity = message[0]
+        self.content, self.id_, self.type_ = message[1:]
         self.socket = socket
 
-    def send(self, content, style=const.DEFAULT_STYLE):
-        length = len(content)
-        if length > 4096:
-            warn_msg = make_msg('消息过长，只显示部分内容',
+    def send(self, content, style=const.DEFAULT_STYLE, retcode=0):
+        if len(content) > 4096:
+            warn_msg = make_msg(1,
+                                '消息过长，只显示部分内容'.encode('utf-8'),
                                 self.id_, self.type_, const.WARNING_STYLE)
 
             self.socket.send_json(warn_msg)
             content = content[:4096]
-        msg = make_msg(content, self.id_, self.type_, style)
+        msg = make_msg(retcode, content, self.id_, self.type_, style)
 
-        self.socket.send_json(msg)
+        self.socket.send_multipart([self.identity,
+                                    json.dumps(msg)])
 
-        logging.info('推送消息到adapter: {0}'.format(msg))
+        logging.info('推送消息到adapter: {0!r}'.format(msg))
 
-    def send_warning(self, content):
-        self.send(content, style=const.WARNING_STYLE)
+    def warn(self, content):
+        self.send(content, style=const.WARNING_STYLE, retcode=101)
 
-    def send_error(self, content):
-        self.send(content, style=const.ERROR_STYLE)
+    def error(self, content):
+        self.send(content, style=const.ERROR_STYLE, retcode=102)
 
-    def send_info(self, content):
+    def info(self, content):
         self.send(content, style=const.INFO_STYLE)
 
-    def send_code(self, content):
+    def code(self, content):
         self.send(content, style=const.CODE_STYLE)
 
 
@@ -112,7 +116,6 @@ class Engine(object):
     插件应继承此类, 并定制topics
 
     '''
-
     def setup_respond_handlers(self):
         '''
         获得被respond_handler装饰的函数列表
@@ -130,23 +133,23 @@ class Engine(object):
         self.respond_handlers = respond_handlers
         logger.debug('respond handlers: {0}'.format(self.respond_handlers))
 
-    def _recv(self, msg, socket=None):
+    def recv_callback(self, msg):
         '''接收消息
 
-        :param socket: 一个socket连接，pull模式
+        :param msg: 从zmq收到的消息回调
         '''
-        msg_body = json.loads(msg[0])
+        class_name = self.__class__.__name__
+        logger.debug('{0}从backend收到消息: {1!r}'.format(class_name, msg))
+        _identity = msg[0]
+        msg_body = json.loads(msg[1])
         _id = msg_body.get('id')
         _content = msg_body.get('content')
         _type = msg_body.get('type')
 
-        class_name = self.__class__.__name__
-
-        logger.debug('{0}从router收到消息: {1}'.format(class_name, msg_body))
         respond_results = {}
         for handler in self.respond_handlers:
             try:
-                res = handler(Message((_content, _id, _type), socket))
+                res = handler(Message((_identity, _content, _id, _type), self.push))
                 respond_results[class_name] = res
             except Exception as e:
                 logger.error('Handler处理失败')
@@ -155,18 +158,26 @@ class Engine(object):
 
         logging.info('Handler执行结果：{0}'.format(respond_results))
 
-    def run(self, push):
+    def run(self, identify, socket):
         self.setup_respond_handlers()
         # context 必须在run方法里创建
         #http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
         context = zmq.Context(1)
 
         subscriber = context.socket(zmq.SUB)
-        subscriber.connect('ipc://{0}/route.ipc'.format(config.ipc_path))
+        subscriber.connect('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
+                                                              identify))
 
         subscriber.setsockopt(zmq.SUBSCRIBE, '')
 
+        self.push = socket
+
         logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
-        stream = zmqstream.ZMQStream(subscriber)
-        callback = functools.partial(self._recv, socket=push)
-        stream.on_recv(callback)
+        self.stream = zmqstream.ZMQStream(subscriber)
+        self.stream.on_recv(self.recv_callback)
+
+    def stop(self):
+        self.stream.stop_on_recv()
+
+    def waitfor(self):
+        pass

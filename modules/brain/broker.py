@@ -28,47 +28,54 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : config.py
+#  File        : broker.py
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
-#  Date        : 2014-02-09
-#  Description : configurations
+#  Date        : 2014-03-14
+#  Description : 消息转发中间件
+
+import threading
+
+import zmq
+
+import config
 
 
-import os
-import yaml
+def main():
+    try:
+        #FIXME 好像有问题
+        #adapter to backend
+        context = zmq.Context(1)
 
-home = os.getenv('TOMBOT_HOME')
+        capture = context.socket(zmq.PUSH)
+        capture.bind('ipc://{0}/capture.ipc'.format(config.ipc_path))
 
-if not home:
-    print('未配置TOMBOT_HOME环境变量，程序退出。')
-    exit(1003)
+        frontend = context.socket(zmq.ROUTER)
+        frontend.bind(config.server_socket)
 
-# _path = os.path.abspath(os.path.dirname(__file__))
-config_file = file('{0}/conf/config.yaml'.format(home))
+        backend = context.socket(zmq.DEALER)
+        backend.bind('ipc://{0}/broker.ipc'.format(config.ipc_path))
 
-try:
-    yaml_dict = yaml.load(config_file)
-except Exception as e:
-    print('配置文件载入错误:{0}'.format(e))
-    exit(1006)
-name = yaml_dict.get('name')
-home = yaml_dict.get('home')
+        t = threading.Thread(target=zmq.proxy, args=(frontend,
+                                                     backend,
+                                                     capture))
+#         t = threading.Thread(target=zmq.proxy, args=(frontend,
+#                                                      backend))
+        t.daemon = False
+        t.start()
 
-log_level = yaml_dict['backend'].get('log_level')
-plugins = yaml_dict.get('plugins')
-debug = yaml_dict['backend'].get('debug')
-ansibles = yaml_dict.get('ansibles')
+        debug_socket = context.socket(zmq.PULL)
+        debug_socket.connect('ipc://{0}/capture.ipc'.format(config.ipc_path))
 
-ipc_path = yaml_dict['backend'].get('ipc_path')
-server_socket = yaml_dict['backend'].get('server_socket')
-use_tcp = yaml_dict['backend'].get('use_tcp')
+        while True:
+            msg = debug_socket.recv()
+            print(msg)
 
-use_proxy = yaml_dict.get('use_proxy')
-proxy_host = yaml_dict.get('proxy_host')
-proxy_port = yaml_dict.get('proxy_port')
+    except KeyboardInterrupt:
+        frontend.close()
+        backend.close()
+        context.term()
+        exit(0)
 
-default_mode = yaml_dict['backend'].get('default_mode')
-
-backend_count = yaml_dict['backend'].get('workers')
-capture = yaml_dict['broker'].get('capture')
+if __name__ == '__main__':
+    main()

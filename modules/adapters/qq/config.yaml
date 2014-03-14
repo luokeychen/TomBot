@@ -1,5 +1,4 @@
-pull_socket: tcp://192.168.3.107:4444
-pub_socket: tcp://192.168.3.107:4445
+req_socket: tcp://192.168.3.107:4445
 
 use_proxy: False
 proxy_host: 192.168.13.19
@@ -12,8 +11,9 @@ smtp_port: 110
 smtp_account: konglx
 smtp_password: Jay19880821
 
-verify: {
-    http_host: 192.168.3.107,
-    http_port: 8000,
+verify: 
+    use_http: True,
+    http_host: 192.168.3.107
+    http_port: 8001
     email: konglx@ffcs.cn
-}
+

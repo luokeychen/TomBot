@@ -3,10 +3,6 @@ import gevent
 import os
 import random
 import time
-from multiprocessing import Process
-
-from forwarder import config
-
 
 context = zmq.Context(1)
 pub = context.socket(zmq.PUB)

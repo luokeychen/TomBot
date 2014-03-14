@@ -78,7 +78,7 @@ class SimSimi(Engine):
     message = None
 
     def callback(self, response):
-        self.message.send_info(response.encode('utf-8'))
+        self.message.info(response.encode('utf-8'))
 
     @respond_handler(u'^[\u4e00-\u9fa5]+')
     def handle_message(self, message, matches):

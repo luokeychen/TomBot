@@ -33,11 +33,12 @@ from server import http_server_run
 from email.mime.text import MIMEText
 
 logger = logging.getLogger('client')
+logger.setLevel(logging.DEBUG)
 
 fp = file('config.yaml')
 config = yaml.load(fp)
 
-pub_socket = config.get('pub_socket')
+push_socket = config.get('push_socket')
 pull_socket = config.get('pull_socket')
 
 SMTP_HOST = config.get('smtp_host')
@@ -46,17 +47,19 @@ SMTP_PASSWORD = config.get('smtp_password')
 HTTP_HOST = config['verify'].get('http_host')
 HTTP_PORT = config['verify'].get('http_port')
 EMAIL = config['verify'].get('email')
+USE_HTTP = config['verify'].get('use_http')
 
 use_proxy = config.get('use_proxy')
 proxy_host = config.get('proxy_host')
 proxy_port = config.get('proxy_port')
 
+req_socket = config.get('req_socket')
+
 context = zmq.Context(1)
-pub = context.socket(zmq.PUB)
+socket = context.socket(zmq.DEALER)
+socket.setsockopt(zmq.IDENTITY, 'QQ')
 _home = os.getenv('TOMBOT_HOME')
-pub.connect(pub_socket)
-pull = context.socket(zmq.PULL)
-pull.connect(pull_socket)
+socket.connect(req_socket)
 
 
 def send_notice_email():
@@ -97,18 +100,21 @@ class Client(WebQQClient):
             self.handler.r = r
             self.handler.uin = uin
 
-        # FIXME config support
-        logger.info("请打开 http://{0}:{1} 输入验证码"
-                    .format(HTTP_HOST, HTTP_PORT))
-        if send_notice_email():
-            logger.info("发送通知邮件成功")
+        if USE_HTTP:
+            logger.info("请打开 http://{0}:{1} 输入验证码"
+                        .format(HTTP_HOST, HTTP_PORT))
         else:
-            logger.warning("发送通知邮件失败")
             logger.info(u"验证码本地路径为: {0}".format(self.hub.checkimg_path))
             check_code = None
             while not check_code:
                 check_code = raw_input("输入验证码: ")
             self.enter_verify_code(check_code, r, uin)
+            return
+
+        if send_notice_email():
+            logger.info("发送通知邮件成功")
+        else:
+            logger.warning("发送通知邮件失败")
 
     def enter_verify_code(self, code, r, uin, callback=None):
         super(Client, self).enter_verify_code(code, r, uin)
@@ -153,13 +159,6 @@ class Client(WebQQClient):
             return
         self.handle_verify_callback(True)
 
-#    def handle_verify_code(self, path, r, uin):
-#        logger.info(u'验证码本地路径为: {0}'.format(path))
-#        check_code = None
-#        while not check_code:
-#            check_code = raw_input(u'输入验证码: ')
-#        self.enter_verify_code(check_code, r, uin)
-
     @system_message_handler
     def handle_friend_add(self, mtype, from_uin, account, message):
         if mtype == 'verify_required':
@@ -170,7 +169,7 @@ class Client(WebQQClient):
         msg = {'content': content.encode('utf-8'),
                'id': str(did),
                'type': 'discu'}
-        pub.send_json(msg)
+        socket.send_json(msg)
 
     @group_message_handler
     def handle_group_message(self, member_nick, content, group_code,
@@ -178,14 +177,14 @@ class Client(WebQQClient):
         msg = {'content': content.encode('utf-8'),
                'id': str(group_code),
                'type': 'group'}
-        pub.send_json(msg)
+        socket.send_json(msg)
 
     @buddy_message_handler
     def handle_buddy_message(self, from_uin, content, source):
         msg = {'content': content.encode('utf-8'),
                'id': str(from_uin),
                'type': 'buddy'}
-        pub.send_json(msg)
+        socket.send_json(msg)
 
     @kick_message_handler
     def handle_kick(self, message):
@@ -197,9 +196,11 @@ class Client(WebQQClient):
             logger.error(u"获取登出消息 {0!r}".format(data))
             self.hub.relogin()
 
-        if data and data.get("retcode") in [103]:  # 103重新登陆不成功, 暂时退出
+        if data and data.get("retcode") in [103]:  # 103重新登陆不成功,或被系统T掉，重新登录
             logger.error(u"获取登出消息 {0!r}".format(data))
+            self.hub.relogin()
             exit()
+
     def run(self, handler=None):
         self.handler = handler
         super(Client, self).run()
@@ -216,10 +217,11 @@ if __name__ == '__main__':
         webqq.hub.http.set_proxy(proxy_host, proxy_port)
 
     def zmq_handler(msg):
-        if msg == ['\x01']:
-            return
         logger.info(msg)
-        msg_body = json.loads(msg[0])
+        try:
+            msg_body = json.loads(msg[0])
+        except ValueError as e:
+            logger.warn('消息解析失败:{0}'.format(e))
         logger.info('adapter收到消息：{0}'.format(msg_body))
         _content = msg_body.get('content')
         _id = msg_body.get('id')
@@ -236,10 +238,13 @@ if __name__ == '__main__':
         else:
             logger.error('zmq message format error')
 
-    stream = zmqstream.ZMQStream(pull)
+    stream = zmqstream.ZMQStream(socket)
     stream.on_recv(zmq_handler)
 
-try:
-    http_server_run(webqq)
-except KeyboardInterrupt:
-    logger.info("收到退出信号，程序退出...")
+    try:
+        if USE_HTTP:
+            http_server_run(webqq)
+        else:
+            webqq.run()
+    except KeyboardInterrupt:
+        logger.info("收到退出信号，程序退出...")

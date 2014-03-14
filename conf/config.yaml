@@ -3,21 +3,23 @@ name: Tom
 # 机器人home目录
 home: /home/konglx/project/TomBot
 # 日志级别，有效的取值：debug info warn error critical
-log_level: debug
-# 暂时没用
-adapter: qq
+
 # 用tcp连接或IPC，默认IPC，adapter和服务端没有部署在一起时有用，现在没用
-use_tcp: True
-push_socket: tcp://*:4444
-sub_socket: tcp://*:4445
+backend: 
+    log_level: debug
+    use_tcp: True
+    server_socket: tcp://*:4445
+    #默认模式：cmd normal easy
+    default_mode: normal
+    # IPC文件的目录
+    ipc_path: /home/konglx/project/TomBot/run
+    # 此处为true，那么日志级别也被自动设置为debug
+    debug: True
+    workers: 3
+    
 
-#默认模式：cmd normal easy
-default_mode: easy
-
-# IPC文件的目录
-ipc_path: /home/konglx/project/TomBot/run
-# 此处为true，那么日志级别也被自动设置为debug
-debug: True
+broker: 
+    capture: True
 
 use_proxy: False
 http_proxy: 192.168.13.19
@@ -32,11 +34,12 @@ plugins:
     - calc
     - ping
     - help
-    - flow
-    - qiubai
-    - fun
-    - simsimi
+#     - flow
+#     - qiubai
+#     - fun
+#     - simsimi
     - notify
 
 ansibles:
   - simple_runner
+

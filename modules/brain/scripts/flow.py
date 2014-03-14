@@ -52,7 +52,7 @@ class Flow(Engine):
         else:
             try:
                 cs.execute(sql2)
-                message.send_info('标题模糊查找时只显示一行结果')
+                message.info('标题模糊查找时只显示一行结果')
             except cx_Oracle.DatabaseError as e:
                 message.send(e.__str__())
         result = cs.fetchone()
