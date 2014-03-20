@@ -35,38 +35,21 @@
 #  Description : engine for TomBot
 
 import logging
-import re
-import inspect
+from functools import wraps
 
-import zmq
-from zmq.eventloop import zmqstream
-import zmq.utils.jsonapi as json
+import json
 
 from utils import make_msg
-import config
 import const
 
-logger = logging.getLogger('')
+logger = logging.getLogger(__name__)
+
+respond_handlers = {}
 
 
-def respond_handler(arg):
-    '''消息响应装饰器
-
-    :param arg: arg应是一个合法的正则表达式
-    '''
-    regexp = re.compile(arg, re.IGNORECASE)
-
-    def wrapper(func):
-        def __handler(*args, **kwargs):
-            matches = re.match(regexp, args[1].content)
-            if matches:
-                logger.info(u'匹配到正则表达式: {0}'.format(matches.string))
-                return func(args[0], args[1], matches)
-            else:
-                logger.info(u'消息被丢弃: {0}'.format(args[1].content))
-                return None
-        return __handler
-    return wrapper
+def plugin(cls):
+    cls.__plugin__ = True
+    return cls
 
 
 class Message(object):
@@ -82,6 +65,7 @@ class Message(object):
         self.identity = message[0]
         self.content, self.id_, self.type_ = message[1:]
         self.socket = socket
+        self.respond_map = {}
 
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0):
         if len(content) > 4096:
@@ -111,73 +95,27 @@ class Message(object):
         self.send(content, style=const.CODE_STYLE)
 
 
-class Engine(object):
+class Respond(object):
     '''
-    插件应继承此类, 并定制topics
+    插件应继承此类
 
     '''
-    def setup_respond_handlers(self):
+    def __init__(self):
+        self.respond_map = {}
+
+    def register(self, pattern):
+        '''消息响应装饰器
+
+        :param pattern: pattern应是一个合法的正则表达式
         '''
-        获得被respond_handler装饰的函数列表
-        '''
-        respond_handlers = []
-        for _, handler in inspect.getmembers(self, callable):
-            # FIXME 这里用装饰过的函数名来判断被装饰过的函数列表，
-            # 所以自己定义的任何callable对象，不能命名为__handler
-            if handler.__name__ == '__handler':
-                if handler not in respond_handlers:
-                    respond_handlers.append(handler)
-            else:
-                continue
+        def wrapper(func, *args, **kwargs):
+            self.respond_map[pattern] = func.__name__
+            return func
+        return wrapper
 
-        self.respond_handlers = respond_handlers
-        logger.debug('respond handlers: {0}'.format(self.respond_handlers))
-
-    def recv_callback(self, msg):
-        '''接收消息
-
-        :param msg: 从zmq收到的消息回调
-        '''
-        class_name = self.__class__.__name__
-        logger.debug('{0}从backend收到消息: {1!r}'.format(class_name, msg))
-        _identity = msg[0]
-        msg_body = json.loads(msg[1])
-        _id = msg_body.get('id')
-        _content = msg_body.get('content')
-        _type = msg_body.get('type')
-
-        respond_results = {}
-        for handler in self.respond_handlers:
-            try:
-                res = handler(Message((_identity, _content, _id, _type), self.push))
-                respond_results[class_name] = res
-            except Exception as e:
-                logger.error('Handler处理失败')
-                logger.exception(e)
-                continue
-
-        logging.info('Handler执行结果：{0}'.format(respond_results))
-
-    def run(self, identify, socket):
-        self.setup_respond_handlers()
-        # context 必须在run方法里创建
-        #http://lists.zeromq.org/pipermail/zeromq-dev/2013-November/023670.html
-        context = zmq.Context(1)
-
-        subscriber = context.socket(zmq.SUB)
-        subscriber.connect('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
-                                                              identify))
-
-        subscriber.setsockopt(zmq.SUBSCRIBE, '')
-
-        self.push = socket
-
-        logger.info('{0}脚本开始监听'.format(self.__class__.__name__))
-        self.stream = zmqstream.ZMQStream(subscriber)
-        self.stream.on_recv(self.recv_callback)
-
-    def stop(self):
-        self.stream.stop_on_recv()
-
-    def waitfor(self):
-        pass
+    def get_respond(self, pattern):
+        func_name = self.respond_map.get(pattern, None)
+        if func_name is None:
+            logger.warn('未注册响应器:{0}'.format(pattern))
+        else:
+            return func_name

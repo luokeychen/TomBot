@@ -51,7 +51,7 @@ class SimpleRunner(Engine):
 # construct the ansible runner and execute on all hosts
     # @respond_handler('exec (\w+) (on)? (\w*)$')
     # TODO 指定主机
-    @respond_handler('exec (\w+)(.*)')
+    @respond_handler('exec (\w+)( on )?(\w+)?$')
     def handler(self, message, matches):
 
         accept_commands = ['uptime', 'ls', 'df', 'du', 'vmstat', 'iostat', 'netstat', 'sar',
@@ -61,7 +61,7 @@ class SimpleRunner(Engine):
                            'ulimit', 'dmesg', 'head', 'tail', 'hostname', 'ifconfig', 'lsblk',
                            'uname', 'cd', 'pwd', 'java']
 
-        pattern = '*'
+        pattern = matches.group(2) or '*'
 
         for command in accept_commands:
             if command == matches.group(1):

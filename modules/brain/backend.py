@@ -28,13 +28,11 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : forwarder.py
+#  File        : backend.py
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-02-09
-#  Description : forwarder for TomBot
-
-from __future__ import print_function
+#  Description : TomBot Backend用于处理消息及插件
 
 import re
 import logging
@@ -53,13 +51,13 @@ from zmq.eventloop import ioloop
 ioloop.install()
 
 from session import Room, RoomManager
+from engine import Message
 from utils import make_msg
-from engine import Engine
 import config
 
 _path = os.path.abspath(os.path.dirname(__file__))
 
-logger = logging.getLogger('')
+logger = logging.getLogger('Backend')
 
 
 class BackendManager(object):
@@ -87,7 +85,6 @@ class BackendManager(object):
 class Backend(object):
     def __init__(self, identify):
         self.identity = identify
-        self.pushsocket = None
         self.pm = None
 
     def start(self):
@@ -96,11 +93,11 @@ class Backend(object):
         '''
         context = zmq.Context(1)
         # 所有插件都应该使用这个socket，否则会自动负载均衡，破坏逻辑
-        self.pushsocket = context.socket(zmq.DEALER)
-        self.pushsocket.connect('ipc://{0}/broker.ipc'.format(config.ipc_path))
+        # TODO 统一封装获取socket的函数
+        self.brokersock = context.socket(zmq.DEALER)
+        self.brokersock.connect('ipc://{0}/broker.ipc'.format(config.ipc_path))
 
         backend = context.socket(zmq.PUB)
-
         backend.bind('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
                                                         self.identity))
 
@@ -108,9 +105,10 @@ class Backend(object):
         rm = RoomManager()
 
         logger.info('开始载入脚本...')
-        self.pm = PluginManager(self.identity, socket=self.pushsocket)
+        self.pm = PluginManager(self.identity, pushsock=self.brokersock)
         self.pm.load_scripts('plugin')
         self.pm.load_scripts('ansible')
+        self.pm.start()
         logger.info('脚本载入完成')
         logger.info('backend准备开始监听')
 
@@ -133,7 +131,6 @@ class Backend(object):
                 room = rm.get_room(_id)
 
             #模式切换特殊处理
-            #FIXME 未加信封
             if _content == 'tom mode cmd':
                 room.mode = 'command'
                 logger.info('切换到command模式')
@@ -183,7 +180,7 @@ class Backend(object):
             logging.debug('发布消息给scripts: {0!r}'.format(msg))
             backend.send_multipart([identity, json.dumps(msg)])
 
-        stream = zmqstream.ZMQStream(self.pushsocket)
+        stream = zmqstream.ZMQStream(self.brokersock)
         stream.on_recv(callback)
 
         loop = ioloop.IOLoop.instance()
@@ -197,23 +194,27 @@ class Backend(object):
             ioloop.IOLoop.instance().stop()
 
 
-class PluginManager(object):
+class PluginManager(Thread):
     '''插件管理器'''
-    def __init__(self, identity=None, socket=None):
-        self.push = socket
-
+    def __init__(self, identity=None, pushsock=None):
+        super(PluginManager, self).__init__()
+        self.pushsock = pushsock
         self.identity = identity
         self.actives = {}
+
+        self.daemon = False
 
     def load_scripts(self, type_):
         '''载入插件
         '''
-        # 插件需要一个push连接以推送消息到adapter
         scripts = None
         if type_ == 'plugin':
             scripts = config.plugins
         if type_ == 'ansible':
             scripts = config.ansibles
+
+        if scripts is None:
+            return
 
         for plugin in scripts:
             self.run_script(plugin)
@@ -230,27 +231,58 @@ class PluginManager(object):
 
         for item in dir(m):
             attr = getattr(m, item)
-            # 载入所有继承了Engine的类
-            if isclass(attr) and issubclass(attr, Engine) \
-                    and attr != Engine:
-
+            # 载入所有插件类
+            if isclass(attr) and hasattr(attr, '__plugin__'):
                 _instance = attr()
-                self.actives[plugin] = _instance
-                logger.info('正在实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
-                try:
-                    t = Thread(name=plugin,
-                               target=_instance.run,
-                               args=(self.identity, self.push))
-                    t.daemon = False
-                except Exception as e:
-                    logger.warn('脚本载入失败，错误信息：{0}'.format(e))
-                    return 1
-                t.start()
+                #TODO multi handle class support
+                self.actives[plugin] = _instance, m
+                logger.info('实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
 
-    def reload(self, plugin):
-        thread_instance = self.actives.get(plugin)
-        if thread_instance.isAlive():
-            thread_instance.stop()
+    def recv_callback(self, msg):
+        logger.debug('PLUGINMANAGER收到消息:{0}'.format(msg))
+        identity = msg[0]
+        msg_body = json.loads(msg[1])
+        id_ = msg_body.get('id')
+        content = msg_body.get('content')
+        type_ = msg_body.get('type')
+
+        msg = Message((identity, content, id_, type_),
+                      self.pushsock
+                      )
+        self.parse_command(msg)
 
     def parse_command(self, msg):
-        pass
+        logger.info('开始匹配')
+        match_result = {}
+        for name, (instance, module) in self.actives.iteritems():
+            logger.debug('name:{0}, respond map:{1}'.format(name, module.respond.respond_map))
+
+            for pattern, handler in module.respond.respond_map.iteritems():
+                #只会执行一次，无需编译
+#                 pattern = re.compile(pattern)
+                matches = re.match(pattern, msg.content)
+                match_result[name] = matches
+                # 获取注册的函数名
+                func_name = module.respond.get_respond(pattern)
+                # 获取函数示例
+                # FIXME 这种机制可能有问题
+                func = getattr(instance, func_name)
+                if matches:
+                    t = Thread(target=func,
+                               args=(msg, matches))
+                    t.daemon = False
+                    t.start()
+                else:
+                    msg.warn('Tom检测到您似乎输入的是一个命令，但未找到任何匹配')
+
+        logger.info('匹配结果：{0}'.format(match_result))
+
+    def run(self):
+        context = zmq.Context(1)
+        backsock = context.socket(zmq.SUB)
+        backsock.setsockopt(zmq.SUBSCRIBE, '')
+        backsock.connect('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
+                                                            self.identity))
+
+        stream = zmqstream.ZMQStream(backsock)
+        stream.on_recv(self.recv_callback)

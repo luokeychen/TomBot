@@ -63,3 +63,4 @@ TODO
  * 增加权限管理
  * SSH
  * 考虑增强zmq的安全性
+ * 整理、规范logging

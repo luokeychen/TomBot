@@ -8,8 +8,8 @@ from __future__ import with_statement
 from __future__ import nested_scopes
 
 import paramiko
-import gevent
 import socket
+
 
 def test():
     username = 'jagent'
@@ -22,10 +22,11 @@ def test():
     trans = paramiko.Transport(tcpsock)
     trans.connect(username=username, password=password)
     sftp = paramiko.SFTPClient.from_transport(trans)
-    sftp.get('/home/jagent/itsmpost.log', '/tmp/itsmpost.log')
+    sftp.get('/proc/stat', '/tmp/stat')
 
 if __name__ == '__main__':
     test()
+
 
 def sftp_init():
     #TODO 寻找更高效的连接方式
@@ -40,20 +41,20 @@ def sftp_init():
 #            tcpsock.settimeout(5)
 #            tcpsock.connect((hostname, port))
 #            tcpsock.connect(hostname, port)
-        trans = paramiko.Transport(hostname ,port)
+        trans = paramiko.Transport(hostname, port)
         trans.connect(username=username, password=password)
         sftp = paramiko.SFTPClient.from_transport(trans)
     except:
         pass
 
     finally:
-        tcpsock.close()
+#        tcpsock.close()
         trans.close()
 
     return sftp
 
 
-class SFTPGraber(object):
+class LogGraber(object):
     def __init(self, sftp, remote_path):
         pass
 

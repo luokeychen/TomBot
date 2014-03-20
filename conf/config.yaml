@@ -15,15 +15,16 @@ backend:
     ipc_path: /home/konglx/project/TomBot/run
     # 此处为true，那么日志级别也被自动设置为debug
     debug: True
-    workers: 3
+    workers: 1
     
 
 broker: 
     capture: True
 
-use_proxy: False
-http_proxy: 192.168.13.19
-http_port: 7777
+proxy:
+    enable: False
+    host: 192.168.13.19
+    port: 7777
 
 # 暂时不用
 redis_server : 127.0.0.1
@@ -32,14 +33,14 @@ redis_port : 9673
 # 启用的插件列表
 plugins:
     - calc
-    - ping
-    - help
+#     - ping
+#     - help
 #     - flow
 #     - qiubai
 #     - fun
 #     - simsimi
-    - notify
+#     - notify
 
-ansibles:
+runner:
   - simple_runner
 

@@ -199,7 +199,6 @@ class Client(WebQQClient):
         if data and data.get("retcode") in [103]:  # 103重新登陆不成功,或被系统T掉，重新登录
             logger.error(u"获取登出消息 {0!r}".format(data))
             self.hub.relogin()
-            exit()
 
     def run(self, handler=None):
         self.handler = handler
