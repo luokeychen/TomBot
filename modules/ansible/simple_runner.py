@@ -80,4 +80,3 @@ class SimpleRunner(object):
                 message.send(result)
                 return
         message.error('禁止执行的命令!')
-        return True

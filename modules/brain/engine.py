@@ -62,19 +62,19 @@ class Message(object):
     def __init__(self, message, socket):
         self.msg = message
         self.identity = message[0]
-        self.content, self.id_, self.type_ = message[1:]
+        self.content, self.id_, self.type_, self.user = message[1:]
         self.socket = socket
         self.respond_map = {}
 
-    def send(self, content, style=const.DEFAULT_STYLE, retcode=0):
+    def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None):
         if len(content) > 4096:
             warn_msg = make_msg(1,
                                 '消息过长，只显示部分内容'.encode('utf-8'),
-                                self.id_, self.type_, const.WARNING_STYLE)
+                                self.id_, self.type_, self.user, const.WARNING_STYLE)
 
             self.socket.send_json(warn_msg)
             content = content[:4096]
-        msg = make_msg(retcode, content, self.id_, self.type_, style)
+        msg = make_msg(retcode, content, self.id_, self.type_, self.user, style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])

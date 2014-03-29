@@ -140,14 +140,15 @@ def gbk2utf8(string):
     return string.decode('GBK').encode('UTF-8')
 
 
-def make_msg(retcode, content=None, id_=None, type_=None,
+def make_msg(retcode=0, content=None, id_=None, type_=None, user=None,
              style=const.DEFAULT_STYLE):
 
     msg = dict(retcode=retcode,
                content=content,
                style=style,
                id=id_,
-               type=type_)
+               type=type_,
+               user=user)
     return msg
 
 

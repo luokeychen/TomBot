@@ -2,43 +2,62 @@ import os
 import sys
 import zmq
 import threading
-from zmq.eventloop import ioloop, zmqstream
 
 _home = os.getenv('TOMBOT_HOME')
 _prompt = 'TomBot> '
 
-context = zmq.Context()
-pub = context.socket(zmq.PUB)
-pub.connect('ipc://{0}/run/publish.ipc'.format(_home))
-pull = context.socket(zmq.PULL)
-pull.bind('ipc://{0}/run/push.ipc'.format(_home))
+context = zmq.Context(1)
+dealer = context.socket(zmq.DEALER)
+dealer.setsockopt(zmq.IDENTITY, 'SHELL')
+dealer.connect('tcp://127.0.0.1:4445')
 
-def prompt():
-    user_input = raw_input(_prompt)
-    if user_input == 'exit':
-        exit(0)
-    elif user_input != '':
-        _ = ' '
-        pub.send_multipart([user_input, _, _])
 
-def run():
+class Shell(object):
+    def __init__(self):
+        self.lock = True
 
-    while True:
-        try:
-            command = prompt()
-        except KeyboardInterrupt:
-            pass
+    def prompt(self):
+        user_input = raw_input(_prompt)
+        if user_input == 'exit':
+            sys.exit(0)
+        elif user_input == '':
+            self.lock = True
+        else:
+            _ = ' '
+            msg = dict(content=user_input,
+                       type=_,
+                       id=_,
+                       user=_
+                       )
+            dealer.send_json(msg)
 
-def _on_recv():
-    while True:
-        content, _, _ = pull.recv_multipart()
-        print(content)
-        command = prompt()
+    def run(self):
+
+        t = threading.Thread(target=self.recv)
+        t.daemon = True
+        t.start()
+
+        while True:
+            if self.lock:
+                self.lock = False
+                try:
+                    self.prompt()
+                except KeyboardInterrupt:
+                    pass
+                except EOFError:
+                    sys.exit(0)
+
+    def recv(self):
+        while True:
+            msg = dealer.recv_json()
+            self.zmq_handler(msg)
+            self.lock = True
+
+    def zmq_handler(self, msg):
+        _content = msg.get('content')
+        print(_content)
 
 
 if __name__ == '__main__':
-    run()
-#    stream = zmqstream.ZMQStream(pull)
-#    stream.on_recv(_on_recv)
-#    loop = ioloop.IOLoop.instance()
-#    loop.start()
+    shell = Shell()
+    shell.run()

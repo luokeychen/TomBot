@@ -44,9 +44,14 @@ class User(object):
     def __init__(self, user_id):
         self.uid = user_id
         self.permission = {"base": True}
-        self.isadmin = False
-        #历史记录最大100条
+        self.admin = False
+        #历史记录最大10条
         self.history = deque(maxlen=10)
+
+    def set_admin(self, boolean):
+        if not type(boolean):
+            raise TypeError
+        self.admin = boolean
 
 
 class Room(object):
@@ -54,7 +59,7 @@ class Room(object):
         self.rid = room_id
         self.rtype = None
         self.mode = config.default_mode
-        self.users = []
+        self.users = {}
 
 
 class RoomManager(object):

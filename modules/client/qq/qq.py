@@ -168,22 +168,25 @@ class Client(WebQQClient):
     def handle_discu_message(self, did, from_uin, content, source):
         msg = {'content': content.encode('utf-8'),
                'id': str(did),
-               'type': 'discu'}
+               'type': 'discu',
+               'user': from_uin}
         socket.send_json(msg)
 
     @group_message_handler
     def handle_group_message(self, member_nick, content, group_code,
-                             send_uin, source):
+                             from_uin, source):
         msg = {'content': content.encode('utf-8'),
                'id': str(group_code),
-               'type': 'group'}
+               'type': 'group',
+               'user': from_uin}
         socket.send_json(msg)
 
     @buddy_message_handler
     def handle_buddy_message(self, from_uin, content, source):
         msg = {'content': content.encode('utf-8'),
                'id': str(from_uin),
-               'type': 'buddy'}
+               'type': 'buddy',
+               'user': from_uin}
         socket.send_json(msg)
 
     @kick_message_handler
@@ -226,6 +229,7 @@ if __name__ == '__main__':
         _id = msg_body.get('id')
         _style = msg_body.get('style')
         _type = msg_body.get('type')
+        _user = msg_body.get('user')
 
 #        _content = _content.decode('utf-8')
         if _type == 'buddy':

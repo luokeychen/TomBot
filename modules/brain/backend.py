@@ -39,6 +39,7 @@ import logging
 import os
 from multiprocessing import Process
 import sys
+from functools import partial
 
 from importlib import import_module
 from threading import Thread
@@ -50,7 +51,7 @@ from zmq.eventloop import zmqstream
 from zmq.eventloop import ioloop
 ioloop.install()
 
-from session import Room, RoomManager
+from session import User, Room, RoomManager
 from engine import Message
 from utils import make_msg
 import config
@@ -93,7 +94,7 @@ class Backend(object):
         '''
         context = zmq.Context(1)
         # 所有插件都应该使用这个socket，否则会自动负载均衡，破坏逻辑
-        # TODO 统一封装获取socket的函数
+        # TODO 统一封装获取socket的函数,合理的命名
         self.brokersock = context.socket(zmq.DEALER)
         self.brokersock.connect('ipc://{0}/broker.ipc'.format(config.ipc_path))
 
@@ -116,11 +117,17 @@ class Backend(object):
             logging.debug('从adapter收到消息: {0}'.format(msg))
             # 处理消息信封，如果只有一层的话，那么第一帧是zmq.IDENTITY或UUID，第二帧为消息内容
             identity = msg[0]
-            msg_body = json.loads(msg[1])
+            try:
+                msg_body = json.loads(msg[1])
+            except ValueError:
+                logger.error('JSON格式错误！')
+                return
             #这里无需处理retcode
             _id = msg_body.get('id')
             _content = msg_body.get('content').strip()
             _type = msg_body.get('type')
+            _user = msg_body.get('user')
+            self.make_msg = partial(make_msg, retcode=0, id_=_id, type_=_type, user=_user)
 
             #若该房间不在字典中，则添加一个
             if not rm.get_room(_id):
@@ -130,31 +137,32 @@ class Backend(object):
             else:
                 room = rm.get_room(_id)
 
+            user = room.users.setdefault(_user, User(_user))
+
             #模式切换特殊处理
             # FIXME 这段代码比较难看，待改进
+
             if _content == 'tom mode cmd':
                 room.mode = 'command'
                 logger.info('切换到command模式')
-                msg = make_msg(0,
-                               'notify Tom已切换到command模式，' +
-                               '所有英文开头的指令都将被当作命令执行',
-                               _id, _type)
+
+                msg = self.make_msg(content='notify Tom已切换到command模式，' +
+                                    '所有英文开头的指令都将被当作命令执行')
                 backend.send_multipart([identity, json.dumps(msg)])
                 return
+
             if _content == 'tom mode normal':
                 room.mode = 'normal'
                 logger.info('切换到normal模式')
-                msg = make_msg(0,
-                               'notify Tom已切换到normal模式',
-                               _id, _type)
+                msg = self.make_msg(content='notify Tom已切换到normal模式')
                 backend.send_multipart([identity, json.dumps(msg)])
                 return
+
             if _content == 'tom mode easy':
                 room.mode = 'easy'
                 logger.info('切换到easy模式')
-                msg = make_msg(0, 'notify Tom已切换到easy模式，' +
-                               '指令将不需要Tom前缀，但会忽略中文',
-                               _id, _type)
+                msg = self.make_msg(content='notify Tom已切换到easy模式，' +
+                                    '指令将不需要Tom前缀，但会忽略中文')
                 backend.send_multipart([identity, json.dumps(msg)])
                 return
 
@@ -165,9 +173,11 @@ class Backend(object):
                     _content = 'exec ' + _content
                 else:
                     return
+
             elif room.mode == 'easy':
                 if not re.compile('^[a-z\?]').match(_content):
                     return
+
             elif room.mode == 'normal':
                 pattern = re.compile('^{0}'.format(config.name),
                                      flags=re.IGNORECASE)
@@ -175,9 +185,10 @@ class Backend(object):
                     _content = pattern.sub('', _content, 1).strip()
                 else:
                     return
+
             else:
                 logger.warn('无效的房间类型{0}'.format(room.mode))
-            msg = make_msg(0, _content, _id, _type)
+            msg = self.make_msg(content=_content)
             logging.debug('发布消息给scripts: {0!r}'.format(msg))
             backend.send_multipart([identity, json.dumps(msg)])
 
@@ -185,6 +196,7 @@ class Backend(object):
         stream.on_recv(callback)
 
         loop = ioloop.IOLoop.instance()
+
         try:
             loop.start()
         except KeyboardInterrupt:
@@ -246,8 +258,9 @@ class PluginManager(Thread):
         id_ = msg_body.get('id')
         content = msg_body.get('content')
         type_ = msg_body.get('type')
+        user = msg_body.get('user')
 
-        msg = Message((identity, content, id_, type_),
+        msg = Message((identity, content, id_, type_, user),
                       self.pushsock
                       )
         self.parse_command(msg)
