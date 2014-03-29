@@ -131,6 +131,7 @@ class Backend(object):
                 room = rm.get_room(_id)
 
             #模式切换特殊处理
+            # FIXME 这段代码比较难看，待改进
             if _content == 'tom mode cmd':
                 room.mode = 'command'
                 logger.info('切换到command模式')
@@ -188,7 +189,7 @@ class Backend(object):
             loop.start()
         except KeyboardInterrupt:
             logger.info('收到退出信号，程序退出...')
-            self.pushsocket.close()
+            self.brokersock.close()
             backend.close()
             context.term()
             ioloop.IOLoop.instance().stop()
@@ -211,7 +212,7 @@ class PluginManager(Thread):
         if type_ == 'plugin':
             scripts = config.plugins
         if type_ == 'ansible':
-            scripts = config.ansibles
+            scripts = config.runners
 
         if scripts is None:
             return
@@ -234,9 +235,9 @@ class PluginManager(Thread):
             # 载入所有插件类
             if isclass(attr) and hasattr(attr, '__plugin__'):
                 _instance = attr()
-                #TODO multi handle class support
                 self.actives[plugin] = _instance, m
                 logger.info('实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
+        logger.info('成功载入的插件:{0}'.format(self.actives.keys()))
 
     def recv_callback(self, msg):
         logger.debug('PLUGINMANAGER收到消息:{0}'.format(msg))
@@ -252,8 +253,8 @@ class PluginManager(Thread):
         self.parse_command(msg)
 
     def parse_command(self, msg):
-        logger.info('开始匹配')
         match_result = {}
+        match_count = 0
         for name, (instance, module) in self.actives.iteritems():
             logger.debug('name:{0}, respond map:{1}'.format(name, module.respond.respond_map))
 
@@ -265,15 +266,18 @@ class PluginManager(Thread):
                 # 获取注册的函数名
                 func_name = module.respond.get_respond(pattern)
                 # 获取函数示例
-                # FIXME 这种机制可能有问题
-                func = getattr(instance, func_name)
+                # FIXME 当有同名变量时，获取不到正确的函数，事实上这里用函数名取就不靠谱
+                func = getattr(instance, func_name, None)
                 if matches:
+                    logger.debug('匹配分组:{0}'.format(matches.groups()))
+                    match_count += 1
+                    # 这里如果用greenlet效果会更好，但对第三方代码的要求变高（不能阻塞）
                     t = Thread(target=func,
                                args=(msg, matches))
                     t.daemon = False
                     t.start()
-                else:
-                    msg.warn('Tom检测到您似乎输入的是一个命令，但未找到任何匹配')
+        if match_count == 0:
+            msg.error('未找到匹配命令或格式有误')
 
         logger.info('匹配结果：{0}'.format(match_result))
 
@@ -284,5 +288,6 @@ class PluginManager(Thread):
         backsock.connect('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
                                                             self.identity))
 
+        # 注册tornado IOLoop回调
         stream = zmqstream.ZMQStream(backsock)
         stream.on_recv(self.recv_callback)

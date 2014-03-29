@@ -9,12 +9,10 @@
 import json
 
 from tornadohttpclient import TornadoHTTPClient
-from engine import Engine, respond_handler
+from engine import Respond, plugin
 import threading
 import time
-
-
-#from plugins import BasePlugin
+respond = Respond()
 
 
 class SimSimiTalk(object):
@@ -72,7 +70,8 @@ class SimSimiTalk(object):
                       callback=_talk)
 
 
-class SimSimi(Engine):
+@plugin
+class SimSimi(object):
     '''tom 中文, 智能回答（来自simsimi）'''
     simsimi = SimSimiTalk()
     message = None
@@ -80,7 +79,7 @@ class SimSimi(Engine):
     def callback(self, response):
         self.message.info(response.encode('utf-8'))
 
-    @respond_handler(u'^[\u4e00-\u9fa5]+')
+    @respond.register(u'^[\u4e00-\u9fa5]+')
     def handle_message(self, message, matches):
         self.message = message
         t = threading.Thread(target=self.talk, args=(message.content, self.callback))

@@ -1,8 +1,11 @@
 #coding: utf-8
-from engine import Engine, respond_handler
+from engine import Respond, plugin
+
+respond = Respond()
 
 
-class Help(Engine):
+@plugin
+class Help(object):
     '''Tom help \t[filter]'''
 
     # 帮助写死了，为了那么点方便搞这么麻烦不值得
@@ -16,7 +19,7 @@ class Help(Engine):
             'Tom make me laugh        [联网]随机发送一则来自糗百的笑话\n'\
             'Tom mode cmd|normal|easy 切换命令模式与正常模式'
 
-    @respond_handler('help')
+    @respond.register('help')
     def respond(self, message, matches):
         message.send(self.helps)
         return True

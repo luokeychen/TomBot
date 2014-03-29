@@ -58,7 +58,7 @@ home = yaml_dict.get('home')
 log_level = yaml_dict['backend'].get('log_level')
 plugins = yaml_dict.get('plugins')
 debug = yaml_dict['backend'].get('debug')
-ansibles = yaml_dict.get('ansibles')
+runners = yaml_dict.get('runners')
 
 ipc_path = yaml_dict['backend'].get('ipc_path')
 server_socket = yaml_dict['backend'].get('server_socket')

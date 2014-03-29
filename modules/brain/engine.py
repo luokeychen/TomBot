@@ -35,7 +35,6 @@
 #  Description : engine for TomBot
 
 import logging
-from functools import wraps
 
 import json
 
@@ -110,6 +109,7 @@ class Respond(object):
         '''
         def wrapper(func, *args, **kwargs):
             self.respond_map[pattern] = func.__name__
+            logger.debug('function dict:{0}'.format(func.__dict__))
             return func
         return wrapper
 

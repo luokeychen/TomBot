@@ -1,9 +1,12 @@
 #coding: utf-8
-from engine import Engine
-from engine import respond_handler
+from engine import Respond, plugin
 import random
 
-class Ping(Engine):
+respond = Respond()
+
+
+@plugin
+class Ping(object):
     '''Tom? 将得到随机应答，用来确认Tom是否在工作'''
     greets = [
             '在，主人！',
@@ -17,7 +20,7 @@ class Ping(Engine):
             '从我眼前走过的老鼠有很多只，但能停留在我心中的只有你这么一只！'
             ]
 
-    @respond_handler('\?$')
+    @respond.register('\?$')
     def respond(self, message, matches):
         message.send(random.choice(self.greets))
         return True

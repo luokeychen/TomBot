@@ -1,25 +1,25 @@
 #coding: utf-8
-from engine import Engine
 from utils import run_in_thread, gbk2utf8
-from engine import respond_handler
+from engine import Respond, plugin
 import cx_Oracle
-# 解决返回值为?的问题
-#import sys
-#reload(sys)
-#sys.setdefaultencoding('gbk')
-import os 
-os.environ['NLS_LANG'] = 'american_america.ZHS16GBK' 
+import os
 
-class Flow(Engine):
+from lru import lru_cache_function
+os.environ['NLS_LANG'] = 'american_america.ZHS16GBK'
+respond = Respond()
+
+
+@plugin
+class Flow(object):
     '''Tom query flow id|标题\t  查询服务流程单号'''
     
-    @respond_handler('flow (.+)$')
+    @respond.register('flow (.+)$')
     def respond(self, message, matches):
         key = matches.group(1)
         if self.check_contain_chinese(key):
-            run_in_thread(target=self.querydb, args=(None, '%'+key+'%', message))
+            self.querydb(None, '%'+key+'%', message)
         else:
-            run_in_thread(target=self.querydb, args=(key, '', message))
+            self.querydb(key, '', message)
 
     def querydb(self, serial, title, message):
         tns = cx_Oracle.makedsn('117.27.132.23', '21001', 'itmwiki')
@@ -27,7 +27,7 @@ class Flow(Engine):
         cs = conn.cursor()
         sql1 = '''
         SELECT * from
-        (select 
+        (select
              t2.flow_id,
               coo.COO_PKP_FLOW_SQL_CFG.GETFLOWSERIAL(T1.FLOW_ID,T1.FLOW_MOD) SERIAL,
              coo.COO_PKP_FLOW_SQL_CFG.GETFLOWTYPE(T1.FLOW_MOD) FLOW_TYPE,
@@ -72,5 +72,3 @@ class Flow(Engine):
             if u'\u4e00' <= ch <= u'\u9fff':
                 return True
         return False
-
-

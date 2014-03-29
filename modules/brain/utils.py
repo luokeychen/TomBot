@@ -35,9 +35,14 @@
 #  Description : some useful code
 
 import threading
+import logging
 
 import const
 import config
+
+logger = logging.getLogger('')
+
+
 """
 Code to timeout with processes.
 
@@ -138,28 +143,29 @@ def gbk2utf8(string):
 def make_msg(retcode, content=None, id_=None, type_=None,
              style=const.DEFAULT_STYLE):
 
-    msg = {'retcode': retcode,
-           'content': content,
-           'style': style,
-           'id': id_,
-           'type': type_}
+    msg = dict(retcode=retcode,
+               content=content,
+               style=style,
+               id=id_,
+               type=type_)
     return msg
-
-
-logger = logging.getLogger('')
 
 
 def init_logger():
     '''初始化logger
     '''
     import tornado.log
-    from tornado.options import options
 
     if not config.debug:
-        options.log_file_prefix = '{0}/log/tom.log'.format(config.home)
-        options.log_file_max_size = 5 * 1024 * 1024
-        options.log_file_num_backups = 5
-        tornado.log.enable_pretty_logging(options)
+        fmt = logging.Formatter('%(asctime)s %(module)s %(levelname)s %(message)s')
+
+        ch = logging.StreamHandler()
+        ch.setFormatter(fmt)
+        fh = logging.FileHandler('{0}/log/tom.log'.format(config.home))
+        fh.setFormatter(fmt)
+
+        logger.addHandler(fh)
+        logger.addHandler(ch)
     else:
         tornado.log.enable_pretty_logging()
 
