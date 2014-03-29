@@ -34,12 +34,13 @@
 #  Date        : Fri Feb 21 20:45:46 2014
 #  Description : simple ansible runner for TomBot
 
-import ansible.runner
-import ansible.inventory
 import logging
 import os
 import re
 
+import ansible.inventory
+
+from helper.raw import raw_runner
 from engine import Respond, plugin
 respond = Respond()
 logger = logging.getLogger(__name__)
@@ -75,30 +76,8 @@ class SimpleRunner(object):
 
         for command in accept_commands:
             if re.match('(\w+)', input_command).group(1) == command:
-                runner = ansible.runner.Runner(
-                    pattern=pattern,
-                    timeout=5,
-                    module_name='raw',
-                    module_args=input_command,
-                    inventory=self.inventory
-                )
-                results = runner.run()
-
-                if results is None:
-                    message.error("No hosts found")
-                    return
-
-                for (hostname, result) in results['contacted'].items():
-                    if not 'failed' in result:
-                        message.send('[{0}] result >>> \n{1}'.format(hostname, result['stdout']))
-
-                for (hostname, result) in results['contacted'].items():
-                    if 'failed' in result:
-                        message.send('[{0}] result >>> \n{1}'.format(hostname, result['msg']))
-
-                for (hostname, result) in results['dark'].items():
-                    message.send('[{0}] result >>> \n{1}'.format(hostname, result['msg']))
-                return 0
-
+                result = raw_runner(input_command, pattern, self.inventory)
+                message.send(result)
+                return
         message.error('禁止执行的命令!')
         return True
