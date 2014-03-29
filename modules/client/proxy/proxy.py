@@ -20,7 +20,7 @@
 #  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 #   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 #  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 #  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 #
@@ -28,26 +28,8 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : const.py
+#  File        : proxy.py
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
-#  Date        : 2014-03-09
-#  Description : consts
-
-DEFAULT_STYLE = {'name': 'Monospace', 'size': 10,
-                 'style': [0, 0, 0], 'color': '000000'}
-
-OK_STYLE = {'name': '微软雅黑', 'size': 10,
-            'style': [0, 0, 0], 'color': '22B14C'}
-
-WARNING_STYLE = {'name': '微软雅黑', 'size': 10,
-                 'style': [0, 0, 0], 'color': 'FF7F27'}
-
-ERROR_STYLE = {'name': '微软雅黑', 'size': 10,
-               'style': [0, 0, 0], 'color': 'ED1C24'}
-
-INFO_STYLE = {'name': '微软雅黑', 'size': 10,
-              'style': [0, 0, 0], 'color': '3F48CC'}
-
-CODE_STYLE = {'name': 'Consolas', 'size': 10,
-              'style': [0, 0, 0], 'color': '000000'}
+#  Date        : 2014-03-29
+#  Description : 负责将需要中转的文件上传到web服务器

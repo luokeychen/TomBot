@@ -13,7 +13,7 @@ backend:
     default_mode: normal
     # IPC文件的目录
     ipc_path: /home/konglx/project/TomBot/run
-    # 此处为true，那么日志级别也被自动设置为debug
+    # 是否调试模式
     debug: True
     workers: 1
     
@@ -33,14 +33,12 @@ redis_port : 9673
 # 启用的插件列表
 plugins:
     - calc
-#     - ping
-#     - help
-#     - flow
-#     - qiubai
-#     - fun
-#     - simsimi
-#     - notify
+    - ping
+    - help
+    - flow
+    - simsimi
+    - notify
 
-runner:
+runners:
   - simple_runner
 

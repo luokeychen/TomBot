@@ -25,7 +25,7 @@
 #
 #
 #  The views and conclusions contained in the software and documentation
-#  are those of the authors and should not be interpreted as representing                                                                                   
+# are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
 #  File        : simple_runner.py
@@ -36,22 +36,23 @@
 
 import ansible.runner
 import ansible.inventory
-import sys
+import logging
 import os
+import re
 
-from engine import Engine, respond_handler
+from engine import Respond, plugin
+respond = Respond()
+logger = logging.getLogger(__name__)
 
 
-class SimpleRunner(Engine):
+@plugin
+class SimpleRunner(object):
     '''Tom exec command    执行命令'''
     def __init__(self):
         inventory_file = os.path.split(os.path.realpath(__file__))[0] + '/inventory/hosts.conf'
         self.inventory = ansible.inventory.Inventory(inventory_file)
 
-# construct the ansible runner and execute on all hosts
-    # @respond_handler('exec (\w+) (on)? (\w*)$')
-    # TODO 指定主机
-    @respond_handler('exec (\w+)( on )?(\w+)?$')
+    @respond.register('exec (.*)')
     def handler(self, message, matches):
 
         accept_commands = ['uptime', 'ls', 'df', 'du', 'vmstat', 'iostat', 'netstat', 'sar',
@@ -61,39 +62,43 @@ class SimpleRunner(Engine):
                            'ulimit', 'dmesg', 'head', 'tail', 'hostname', 'ifconfig', 'lsblk',
                            'uname', 'cd', 'pwd', 'java']
 
-        pattern = matches.group(2) or '*'
+        inputs = matches.group(1)
+        pattern = '*'
+        if inputs.find(' on ') > 0:
+            m = re.match('(.*?) on (.*)', inputs)
+            logger.debug(m.groups())
+            input_command = m.group(1)
+            pattern = m.group(2)
+        else:
+            input_command = inputs
+        logger.debug('input command:{0}'.format(input_command))
 
         for command in accept_commands:
-            if command == matches.group(1):
+            if re.match('(\w+)', input_command).group(1) == command:
                 runner = ansible.runner.Runner(
                     pattern=pattern,
                     timeout=5,
                     module_name='raw',
-                    module_args=matches.group(),
+                    module_args=input_command,
                     inventory=self.inventory
                 )
                 results = runner.run()
 
                 if results is None:
-                    print "No hosts found"
-                    sys.exit(1)
+                    message.error("No hosts found")
+                    return
 
                 for (hostname, result) in results['contacted'].items():
                     if not 'failed' in result:
-#                        message.send_info('[{0}] result>>>'.format(hostname))
-#                        message.send(result['stdout'])
                         message.send('[{0}] result >>> \n{1}'.format(hostname, result['stdout']))
 
                 for (hostname, result) in results['contacted'].items():
                     if 'failed' in result:
-#                        message.send_info('[{0}] result>>>'.format(hostname))
                         message.send('[{0}] result >>> \n{1}'.format(hostname, result['msg']))
 
                 for (hostname, result) in results['dark'].items():
-#                    message.send_info('[{0}] result>>>'.format(hostname))
-#                    message.send(result)
                     message.send('[{0}] result >>> \n{1}'.format(hostname, result['msg']))
                 return 0
 
-        message.send('禁止执行的命令!')
+        message.error('禁止执行的命令!')
         return True

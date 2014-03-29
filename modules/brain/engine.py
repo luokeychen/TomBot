@@ -81,14 +81,17 @@ class Message(object):
 
         logging.info('推送消息到adapter: {0!r}'.format(msg))
 
+    def ok(self, content):
+        self.send(content, style=const.OK_STYLE, retcode=0)
+
+    def info(self, content):
+        self.send(content, style=const.INFO_STYLE)
+
     def warn(self, content):
         self.send(content, style=const.WARNING_STYLE, retcode=101)
 
     def error(self, content):
         self.send(content, style=const.ERROR_STYLE, retcode=102)
-
-    def info(self, content):
-        self.send(content, style=const.INFO_STYLE)
 
     def code(self, content):
         self.send(content, style=const.CODE_STYLE)
