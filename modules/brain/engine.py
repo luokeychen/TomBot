@@ -39,6 +39,7 @@ import json
 import inspect
 import sys
 from Queue import Queue, Empty
+import textwrap
 
 from helpers import make_msg
 from session import Session
@@ -69,10 +70,20 @@ class Message(object):
         self.content, self.id_, self.type_, self.user = message[1:]
         self.socket = socket
 
-    def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None):
+    def _split_chunk(self, string, length):
+        if length >= 4096:
+            logger.warn('分页长度过长，可能无法发送')
+
+        lines = textwrap.wrap(string, width=length)
+        return lines
+
+    def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
         if not content:
             content = '执行结果为空'
             style = const.ERROR_STYLE
+
+        if split > 0:
+            lines = self._split_chunk(content, split)
 
         elif len(content) > 4096:
             warn_msg = make_msg(1,

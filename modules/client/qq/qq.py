@@ -26,7 +26,7 @@ sys.path.append('./twqq')
 from twqq.client import WebQQClient
 from twqq.requests import system_message_handler, group_message_handler, discu_message_handler
 from twqq.requests import buddy_message_handler, kick_message_handler, register_request_handler, PollMessageRequest
-from twqq.requests import FriendInfoRequest, BeforeLoginRequest, Login2Request
+from twqq.requests import FriendListRequest, BeforeLoginRequest, Login2Request
 
 from server import http_server_run
 
@@ -147,7 +147,7 @@ class Client(WebQQClient):
             return self.handle_verify_callback(False, u"登录失败: {0}"
                                                .format(data.get("retcode")))
 
-    @register_request_handler(FriendInfoRequest)
+    @register_request_handler(FriendListRequest)
     def handle_frind_info_erro(self, request, resp, data):
         if not resp.body:
             self.handle_verify_callback(False, u"获取好友列表失败")
