@@ -37,15 +37,16 @@ class SimSimiTalk(object):
     def _set_profile(self, resp):
         def callback(resp):
             self.ready = True
-            params = {"name": "PBot", "uid": "52125598"}
-            headers = {"Referer":"http://www.simsimi.com/set_profile_frameview.htm",
-                       "Accept":"application/json, text/javascript, */*; q=0.01",
-                       "Accept-Language":"zh-cn,en_us;q=0.7,en;q=0.3",
-                       "Content-Type":"application/json; charset=utf-8",
-                       "X-Requested-With":"XMLHttpRequest",
-                       "Cookie": "simsimi_uid=52125598"}
-            self.http.post("http://www.simsimi.com/func/setProfile", params,
-                           headers=headers, callback=callback)
+
+        params = {"name": "PBot", "uid": "52125598"}
+        headers = {"Referer":"http://www.simsimi.com/set_profile_frameview.htm",
+                   "Accept":"application/json, text/javascript, */*; q=0.01",
+                   "Accept-Language":"zh-cn,en_us;q=0.7,en;q=0.3",
+                   "Content-Type":"application/json; charset=utf-8",
+                   "X-Requested-With":"XMLHttpRequest",
+                   "Cookie": "simsimi_uid=52125598"}
+        self.http.post("http://www.simsimi.com/func/setProfile", params,
+                       headers=headers, callback=callback)
 
     def _setup_cookie(self):
         self.http.get("http://www.simsimi.com/talk.htm?lc=ch", callback=self._set_profile)
@@ -58,7 +59,7 @@ class SimSimiTalk(object):
         """
         headers = {"Referer": "http://www.simsimi.com/talk_frameview.htm",
                    "Accept": "application/json, text/javascript, */*; q=0.01",
-                   "Accept-Language": "zh-cn,zh;q=0.8,en-us;q=0.7,en;q=0.3",
+                   "Accept-Language": "zh-cn,en_us;q=0.8,en;q=0.3",
                    "Content-Type": "application/json; charset=utf-8",
                    "X-Requested-With": "XMLHttpRequest",
                    "Cookie": "simsimi_uid=52125598"
