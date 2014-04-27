@@ -65,7 +65,7 @@ class SimSimiTalk(object):
                    }
         if not msg.strip():
             return callback(u"呵呵".encode('utf-8'))
-        params = {"msg": msg}
+        params = {"msg": msg.encode('utf-8')}
         params.update(self.params)
 
         def _talk(resp):
@@ -75,7 +75,7 @@ class SimSimiTalk(object):
                     data = json.loads(resp.body)
                 except ValueError:
                     pass
-            callback(data.get("response", "连接服务器失败"))
+            callback(data.get("response", "连接服务器失败".encode('utf-8')))
 
         self.http.get(self.url, params, headers=headers,
                       callback=_talk)
