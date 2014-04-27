@@ -43,7 +43,6 @@ import config
 
 def main():
     try:
-        #FIXME 好像有问题
         #adapter to backend
         context = zmq.Context(1)
 
@@ -59,8 +58,6 @@ def main():
         t = threading.Thread(target=zmq.proxy, args=(frontend,
                                                      backend,
                                                      capture))
-#         t = threading.Thread(target=zmq.proxy, args=(frontend,
-#                                                      backend))
         t.daemon = False
         t.start()
 

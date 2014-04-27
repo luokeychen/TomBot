@@ -67,12 +67,10 @@ class SimpleRunner(object):
         pattern = '*'
         if inputs.find(' on ') > 0:
             m = re.match('(.*?) on (.*)', inputs)
-            logger.debug(m.groups())
             input_command = m.group(1)
             pattern = m.group(2)
         else:
             input_command = inputs
-        logger.debug('input command:{0}'.format(input_command))
 
         for command in accept_commands:
             if re.match('(\w+)', input_command).group(1) == command:

@@ -34,14 +34,18 @@
 #  Date        : 2014-02-09
 #  Description : engine for TomBot
 
-import logging
 
 import json
+import inspect
+import sys
+from Queue import Queue, Empty
 
-from utils import make_msg
+from helpers import make_msg
+from session import Session
 import const
+import log
 
-logger = logging.getLogger(__name__)
+logger = log.logger
 
 respond_handlers = {}
 
@@ -64,22 +68,26 @@ class Message(object):
         self.identity = message[0]
         self.content, self.id_, self.type_, self.user = message[1:]
         self.socket = socket
-        self.respond_map = {}
 
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None):
-        if len(content) > 4096:
+        if not content:
+            content = '执行结果为空'
+            style = const.ERROR_STYLE
+
+        elif len(content) > 4096:
             warn_msg = make_msg(1,
-                                '消息过长，只显示部分内容'.encode('utf-8'),
+                                '消息过长，只显示部分内容',
                                 self.id_, self.type_, self.user, const.WARNING_STYLE)
 
-            self.socket.send_json(warn_msg)
+            self.socket.send_multipart([self.identity,
+                                        json.dumps(warn_msg)])
             content = content[:4096]
         msg = make_msg(retcode, content, self.id_, self.type_, self.user, style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])
 
-        logging.info('推送消息到adapter: {0!r}'.format(msg))
+        logger.info('推送消息到adapter: {0!r}'.format(msg))
 
     def ok(self, content):
         self.send(content, style=const.OK_STYLE, retcode=0)
@@ -99,26 +107,86 @@ class Message(object):
 
 class Respond(object):
     '''
-    插件应继承此类
-
+    响应器，用于注册及获取响应函数
     '''
     def __init__(self):
         self.respond_map = {}
+        self.plugin = self._get_caller_module()
+        logger.error(self.plugin)
 
     def register(self, pattern):
         '''消息响应装饰器
 
         :param pattern: pattern应是一个合法的正则表达式
         '''
+        # BUG 无法获取wrap前的函数名，functools也不行
         def wrapper(func, *args, **kwargs):
-            self.respond_map[pattern] = func.__name__
-            logger.debug('function dict:{0}'.format(func.__dict__))
+            queue = Queue(1)
+            self.respond_map[pattern] = func, queue
             return func
         return wrapper
 
     def get_respond(self, pattern):
-        func_name = self.respond_map.get(pattern, None)
-        if func_name is None:
+        func = self.respond_map.get(pattern, None)
+        if func is None:
             logger.warn('未注册响应器:{0}'.format(pattern))
         else:
-            return func_name
+            return func
+
+    # FIXME 这种方式可能导致不同Python实现的移植问题
+    @staticmethod
+    def _get_caller_module():
+        stack = inspect.stack()
+        parentframe = stack[2][0]
+
+        module = inspect.getmodule(parentframe)
+
+        return module
+
+    # FIXME 这种方式可能导致不同Python实现的移植问题
+    @staticmethod
+    def _get_caller(skip=2):
+        stack = inspect.stack()
+        start = 0 + skip
+        if len(stack) < start + 1:
+            return ''
+        parentframe = stack[start][0]
+        name = None
+        codename = parentframe.f_code.co_name
+
+        if codename != '<module>': # top level usually
+            name = codename
+        del parentframe
+        return name
+
+    def get_input(self, msg):
+#         session_id = Session.generate_session_id(msg.id_, msg.user)
+        session = Session(msg.id_, msg.user)
+        # get caller
+        caller = self._get_caller()
+        # get caller instance
+        instance = inspect.currentframe().f_back.f_locals['self']
+        caller = getattr(instance, caller)
+        # set session
+        session['iswait'] = True
+
+        for pattern, (func, queue) in self.respond_map.items():
+            if func == caller:
+                session['last'] = [pattern for (pattern, func) in self.respond_map.iteritems() if func == func][0]
+                session.save()
+                try:
+                    logger.info('服务器正在等待用户输入')
+                    message = queue.get(timeout=5)
+                    user_input = message.content
+                    session['iswait'] = False
+                    session.save()
+                    return user_input
+                except Empty:
+                    session['iswait'] = False
+                    session.save()
+                    msg.send(u'输入超时，任务取消')
+                    return None
+
+        session['iswait'] = False
+        session.save()
+        msg.send('由于未知原因，无法读取用户输入')

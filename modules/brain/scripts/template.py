@@ -34,3 +34,4 @@ class Template(Engine):
         message.send('...')
 
 # 你可以载入配置文件，请放在conf.d目录下
+# 包含交互的插件，不可与其他有交互功能的插件同时响应（用户不能在一个session里同时进行两个交互）

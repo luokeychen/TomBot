@@ -35,9 +35,10 @@ plugins:
     - calc
     - ping
     - help
-    - flow
-    - simsimi
+#     - flow
+#     - simsimi
     - notify
+    - interactdemo
 
 runners:
   - simple_runner

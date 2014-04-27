@@ -48,15 +48,15 @@ def raw_runner(command, pattern, inventory):
     output = ''
 
     if results is None:
-        return "没有发现配置好的主机"
+        return '没有发现配置好的主机'
 
     for (hostname, result) in results['contacted'].items():
         if not 'failed' in result:
-            output += ('[{0}] 执行结果 >>> \n{1}\n'.format(hostname, result['stdout']))
+            output += ('[{0}] 成功的执行结果 >>> \n{1}\n'.format(hostname, result['stdout']))
 
     for (hostname, result) in results['contacted'].items():
         if 'failed' in result:
-            output += ('[{0}] 执行结果 >>> \n{1}\n'.format(hostname, result['msg']))
+            output += ('[{0}] 失败的执行结果 >>> \n{1}\n'.format(hostname, result['msg']))
 
     for (hostname, result) in results['dark'].items():
         output += ('[{0}] 执行结果 >>> \n{1}\n'.format(hostname, result['msg']))

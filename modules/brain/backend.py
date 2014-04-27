@@ -35,15 +35,9 @@
 #  Description : TomBot Backend用于处理消息及插件
 
 import re
-import logging
 import os
 from multiprocessing import Process
-import sys
 from functools import partial
-
-from importlib import import_module
-from threading import Thread
-from inspect import isclass
 
 import zmq
 import zmq.utils.jsonapi as json
@@ -51,14 +45,16 @@ from zmq.eventloop import zmqstream
 from zmq.eventloop import ioloop
 ioloop.install()
 
-from session import User, Room, RoomManager
+from session import Room, RoomManager, Session
+from plugin import PluginManager
 from engine import Message
-from utils import make_msg
+from helpers import make_msg
 import config
+import log
 
 _path = os.path.abspath(os.path.dirname(__file__))
 
-logger = logging.getLogger('Backend')
+logger = log.logger
 
 
 class BackendManager(object):
@@ -87,6 +83,18 @@ class Backend(object):
     def __init__(self, identify):
         self.identity = identify
         self.pm = None
+        self.rm = None
+
+    def create_room(self, rid, rtype):
+        #若该房间不在字典中，则添加一个
+        if not self.rm.get_room(rid):
+            room = Room(rid)
+            self.rm.add_room(room)
+            room.rtype = rtype
+        else:
+            room = self.rm.get_room(rid)
+
+        return room
 
     def start(self):
         '''
@@ -98,23 +106,51 @@ class Backend(object):
         self.brokersock = context.socket(zmq.DEALER)
         self.brokersock.connect('ipc://{0}/broker.ipc'.format(config.ipc_path))
 
+        # 经过改造，这里只有一对连接了，可以换成其他的模式
         backend = context.socket(zmq.PUB)
         backend.bind('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
                                                         self.identity))
 
         # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
-        rm = RoomManager()
+        self.rm = RoomManager()
 
         logger.info('开始载入脚本...')
         self.pm = PluginManager(self.identity, pushsock=self.brokersock)
         self.pm.load_scripts('plugin')
         self.pm.load_scripts('ansible')
+        self.pm.backend = self
         self.pm.start()
         logger.info('脚本载入完成')
         logger.info('backend准备开始监听')
 
+        def _special_hack():
+            '''特殊情况处理'''
+            pass
+
+        def _change_mode(content, room):
+            #模式切换特殊处理
+            msg = None
+            if content == 'tom mode cmd':
+                room.mode = 'command'
+                logger.info('切换到command模式')
+
+                msg = self.make_simple_msg(content='notify Tom已切换到command模式，' +
+                                    '所有英文开头的指令都将被当作命令执行')
+
+            if content == 'tom mode normal':
+                room.mode = 'normal'
+                logger.info('切换到normal模式')
+                msg = self.make_simple_msg(content='notify Tom已切换到normal模式')
+
+            if content == 'tom mode easy':
+                room.mode = 'easy'
+                logger.info('切换到easy模式')
+                msg = self.make_simple_msg(content='notify Tom已切换到easy模式，' +
+                                    '指令将不需要Tom前缀，但会忽略中文')
+            return msg
+
         def callback(msg):
-            logging.debug('从adapter收到消息: {0}'.format(msg))
+            logger.debug('从adapter收到消息: {0}'.format(msg))
             # 处理消息信封，如果只有一层的话，那么第一帧是zmq.IDENTITY或UUID，第二帧为消息内容
             identity = msg[0]
             try:
@@ -127,43 +163,28 @@ class Backend(object):
             _content = msg_body.get('content').strip()
             _type = msg_body.get('type')
             _user = msg_body.get('user')
-            self.make_msg = partial(make_msg, retcode=0, id_=_id, type_=_type, user=_user)
+            self.make_simple_msg = partial(make_msg, retcode=0, id_=_id, type_=_type, user=_user)
 
-            #若该房间不在字典中，则添加一个
-            if not rm.get_room(_id):
-                room = Room(_id)
-                rm.add_room(room)
-                room.rtype = _type
-            else:
-                room = rm.get_room(_id)
+            room = self.create_room(_id, _type)
+            # 赋一个空的message对象，用来发送消息
+            room.message = Message((identity, None, _id, _type, _user), self.brokersock)
 
-            user = room.users.setdefault(_user, User(_user))
-
-            #模式切换特殊处理
-            # FIXME 这段代码比较难看，待改进
-
-            if _content == 'tom mode cmd':
-                room.mode = 'command'
-                logger.info('切换到command模式')
-
-                msg = self.make_msg(content='notify Tom已切换到command模式，' +
-                                    '所有英文开头的指令都将被当作命令执行')
+#             user = room.users.setdefault(_user, User(_user))
+            # NOTE 当需要写session时，必须创建对象
+            session = Session(_id, _user)
+            session['history'].append(_content)
+            session.save()
+            logger.debug('backend session:{0}'.format(session._data))
+            if session['iswait']:
+                msg = self.make_simple_msg(content=_content)
+                logger.debug('发送用户输入消息给scripts: {0!r}'.format(msg))
                 backend.send_multipart([identity, json.dumps(msg)])
                 return
 
-            if _content == 'tom mode normal':
-                room.mode = 'normal'
-                logger.info('切换到normal模式')
-                msg = self.make_msg(content='notify Tom已切换到normal模式')
-                backend.send_multipart([identity, json.dumps(msg)])
-                return
+            change_msg = _change_mode(_content, room)
 
-            if _content == 'tom mode easy':
-                room.mode = 'easy'
-                logger.info('切换到easy模式')
-                msg = self.make_msg(content='notify Tom已切换到easy模式，' +
-                                    '指令将不需要Tom前缀，但会忽略中文')
-                backend.send_multipart([identity, json.dumps(msg)])
+            if change_msg:
+                backend.send_multipart([identity, json.dumps(change_msg)])
                 return
 
             #命令模式自动补exec让脚本能够正常处理
@@ -188,8 +209,8 @@ class Backend(object):
 
             else:
                 logger.warn('无效的房间类型{0}'.format(room.mode))
-            msg = self.make_msg(content=_content)
-            logging.debug('发布消息给scripts: {0!r}'.format(msg))
+            msg = self.make_simple_msg(content=_content)
+            logger.debug('发布消息给scripts: {0!r}'.format(msg))
             backend.send_multipart([identity, json.dumps(msg)])
 
         stream = zmqstream.ZMQStream(self.brokersock)
@@ -205,102 +226,3 @@ class Backend(object):
             backend.close()
             context.term()
             ioloop.IOLoop.instance().stop()
-
-
-class PluginManager(Thread):
-    '''插件管理器'''
-    def __init__(self, identity=None, pushsock=None):
-        super(PluginManager, self).__init__()
-        self.pushsock = pushsock
-        self.identity = identity
-        self.actives = {}
-
-        self.daemon = False
-
-    def load_scripts(self, type_):
-        '''载入插件
-        '''
-        scripts = None
-        if type_ == 'plugin':
-            scripts = config.plugins
-        if type_ == 'ansible':
-            scripts = config.runners
-
-        if scripts is None:
-            return
-
-        for plugin in scripts:
-            self.run_script(plugin)
-
-    def run_script(self, plugin):
-        sys.path.append('scripts')
-        sys.path.append('{0}/modules/ansible/'.format(config.home))
-
-        try:
-            m = import_module(plugin)
-        except ImportError as e:
-            logging.error('{0}插件载入失败，错误信息：{1}'.format(plugin, e))
-            return 1
-
-        for item in dir(m):
-            attr = getattr(m, item)
-            # 载入所有插件类
-            if isclass(attr) and hasattr(attr, '__plugin__'):
-                _instance = attr()
-                self.actives[plugin] = _instance, m
-                logger.info('实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
-        logger.info('成功载入的插件:{0}'.format(self.actives.keys()))
-
-    def recv_callback(self, msg):
-        logger.debug('PLUGINMANAGER收到消息:{0}'.format(msg))
-        identity = msg[0]
-        msg_body = json.loads(msg[1])
-        id_ = msg_body.get('id')
-        content = msg_body.get('content')
-        type_ = msg_body.get('type')
-        user = msg_body.get('user')
-
-        msg = Message((identity, content, id_, type_, user),
-                      self.pushsock
-                      )
-        self.parse_command(msg)
-
-    def parse_command(self, msg):
-        match_result = {}
-        match_count = 0
-        for name, (instance, module) in self.actives.iteritems():
-            logger.debug('name:{0}, respond map:{1}'.format(name, module.respond.respond_map))
-
-            for pattern, handler in module.respond.respond_map.iteritems():
-                #只会执行一次，无需编译
-#                 pattern = re.compile(pattern)
-                matches = re.match(pattern, msg.content)
-                match_result[name] = matches
-                # 获取注册的函数名
-                func_name = module.respond.get_respond(pattern)
-                # 获取函数示例
-                # FIXME 当有同名变量时，获取不到正确的函数，事实上这里用函数名取就不靠谱
-                func = getattr(instance, func_name, None)
-                if matches:
-                    logger.debug('匹配分组:{0}'.format(matches.groups()))
-                    match_count += 1
-                    # 这里如果用greenlet效果会更好，但对第三方代码的要求变高（不能阻塞）
-                    t = Thread(target=func,
-                               args=(msg, matches))
-                    t.daemon = False
-                    t.start()
-        if match_count == 0:
-            msg.error('未找到匹配命令或格式有误')
-
-        logger.info('匹配结果：{0}'.format(match_result))
-
-    def run(self):
-        context = zmq.Context(1)
-        backsock = context.socket(zmq.SUB)
-        backsock.setsockopt(zmq.SUBSCRIBE, '')
-        backsock.connect('ipc://{0}/backend_{1}.ipc'.format(config.ipc_path,
-                                                            self.identity))
-
-        # 注册tornado IOLoop回调
-        stream = zmqstream.ZMQStream(backsock)
-        stream.on_recv(self.recv_callback)

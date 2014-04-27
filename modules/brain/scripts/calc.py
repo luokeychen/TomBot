@@ -4,15 +4,12 @@ from math import *
 
 import re
 
-# from engine import Engine
-# from engine import respond_handler
 from engine import Respond, plugin
 from utils import timeout, TimeoutException
 
 respond = Respond()
 
 
-#TODO 用plugin修饰的会自动运行
 @plugin
 class Caculator(object):
     '''Tom calc 表达式 例如：tom calc 123^22/444+123.可以做位运算：tom calc 1<<3|&11|~123'''
