@@ -66,7 +66,7 @@ class SimSimiTalk(object):
                    }
         if not msg.strip():
             return callback(u"呵呵".encode('utf-8'))
-        params = {"req": msg)}
+        params = {"req": msg}
         params.update(self.params)
 
         def _talk(resp):

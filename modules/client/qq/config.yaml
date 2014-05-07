@@ -1,8 +1,8 @@
 req_socket: tcp://192.168.3.107:4445
 
-use_proxy: False
-proxy_host: 192.168.13.19
-proxy_port: 7777
+use_proxy: True
+proxy_host: 117.27.132.20
+proxy_port: 20445
 
 log_level: info
 

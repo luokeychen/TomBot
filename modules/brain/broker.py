@@ -37,8 +37,11 @@
 import threading
 
 import zmq
+import zmq.auth
+from zmq.auth.thread import ThreadAuthenticator
 
 import config
+from log import logger
 
 
 def main():
@@ -51,6 +54,14 @@ def main():
 
         frontend = context.socket(zmq.ROUTER)
         frontend.bind(config.server_socket)
+
+        if zmq.zmq_version_info() < (4, 0):
+            print('WARNING: ZMQ version must be higher than 4.0 for security communication')
+
+        # configure CURVE security
+#         auth_thread = ThreadAuthenticator(context=context, log=logger)
+#         auth_thread.configure_curve(location=config.home + '/certs')
+#         auth_thread.start()
 
         backend = context.socket(zmq.DEALER)
         backend.bind('ipc://{0}/broker.ipc'.format(config.ipc_path))
@@ -69,8 +80,10 @@ def main():
             print(msg)
 
     except KeyboardInterrupt:
+#         auth_thread.stop()
         frontend.close()
         backend.close()
+        capture.close()
         context.term()
         exit(0)
 

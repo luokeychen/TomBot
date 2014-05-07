@@ -12,7 +12,7 @@ backend:
     #默认模式：cmd normal easy
     default_mode: normal
     # IPC文件的目录
-    ipc_path: /home/konglx/project/TomBot/run
+    ipc_path: /home/konglx/project/TomBot/run/ipc
     # 是否调试模式
     debug: True
     workers: 1
@@ -36,7 +36,7 @@ plugins:
     - ping
     - help
 #     - flow
-#     - simsimi
+    - simsimi
     - notify
     - interactdemo
 
