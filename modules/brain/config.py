@@ -72,3 +72,8 @@ default_mode = yaml_dict['backend'].get('default_mode')
 
 backend_count = yaml_dict['backend'].get('workers')
 capture = yaml_dict['broker'].get('capture')
+
+max_message_size = yaml_dict['backend'].get('max_message_size')
+
+plugin_dirs = yaml_dict['plugin_dirs']
+plugin_dirs.append('plugins')

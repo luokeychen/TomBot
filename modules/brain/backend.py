@@ -37,6 +37,7 @@
 import re
 import os
 from multiprocessing import Process
+from collections import defaultdict, deque
 from functools import partial
 
 import zmq
@@ -46,10 +47,9 @@ from zmq.eventloop import ioloop
 ioloop.install()
 
 from session import Room, RoomManager, Session
-from plugin import PluginManager
 from engine import Message
-from helpers import make_msg
 import config
+import holder
 import log
 
 _path = os.path.abspath(os.path.dirname(__file__))
@@ -57,36 +57,35 @@ _path = os.path.abspath(os.path.dirname(__file__))
 logger = log.logger
 
 
-class BackendManager(object):
-    def __init__(self):
-        self.backends = []
-        self.count = 0
-
-    def add(self):
-        b = Backend(self.count)
-        p = Process(target=b.start)
-        p.daemon = False
-        p.start()
-        self.backends.append(p)
-        self.count += 1
-        logger.debug('Backends: {0}'.format(self.backends))
-
-    def delete(self):
-        '''不允许指定删除的backend序号'''
-        p = self.backends[self.count]
-        p.terminate()
-        self.backends.remove(self.count)
-        self.count -= 1
+# class BackendManager(object):
+#     def __init__(self):
+#         self.backends = []
+#         self.count = 0
+#
+#     def add(self):
+#         b = Backend(self.count)
+#         p = Process(target=b.start)
+#         p.daemon = False
+#         p.start()
+#         self.backends.append(p)
+#         self.count += 1
+#         logger.debug('Backends: {0}'.format(self.backends))
+#
+#     def delete(self):
+#         '''不允许指定删除的backend序号'''
+#         p = self.backends[self.count]
+#         p.terminate()
+#         self.backends.remove(self.count)
+#         self.count -= 1
 
 class Backend(object):
-    history = defaultdict(lambda: deque(maxlen=10))
-
+    HISTORY = defaultdict(lambda: deque(maxlen=10))
 
     MSG_ERROR_OCCURRED = 'Sorry for your inconvenience. '\
                          'An unexpected error occurred.'
-    MESSAGE_SIZE_LIMIT = MESSAGE_SIZE_LIMIT
+    MESSAGE_SIZE_LIMIT = config.max_message_size
     MSG_UNKNOWN_COMMAND = 'Unknown command: "%(command)s". '\
-                          'Type "' + BOT_PREFIX + 'help" for available commands.'
+                          'Type "' + config.name + 'help" for available commands.'
     MSG_HELP_TAIL = 'Type help <command name> to get more info '\
                     'about that specific command.'
     MSG_HELP_UNDEFINED_COMMAND = 'That command is not defined.'
@@ -104,7 +103,7 @@ class Backend(object):
                                                         self.identity))
 
         # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
-        self.rm = RoomManager()
+        self.room_manager = RoomManager()
 
         logger.info('开始载入脚本...')
 
@@ -117,6 +116,7 @@ class Backend(object):
         self.re_commands = {}
         self.bot_name = tuple(name.lower() for name in config.name)
 
+    @staticmethod
     def send_simple_reply(message, text):
         message.send(text)
     
@@ -129,16 +129,16 @@ class Backend(object):
 #        self.pm = None
 #        self.rm = None
 #
-#    def create_room(self, rid, rtype):
-#        #若该房间不在字典中，则添加一个
-#        if not self.rm.get_room(rid):
-#            room = Room(rid)
-#            self.rm.add_room(room)
-#            room.rtype = rtype
-#        else:
-#            room = self.rm.get_room(rid)
-#
-#        return room
+    def create_room(self, rid, rtype):
+        """若该房间不在字典中，则添加一个"""
+        if not self.room_manager.get_room(rid):
+            room = Room(rid)
+            self.room_manager.add_room(room)
+            room.rtype = rtype
+        else:
+            room = self.room_manager.get_room(rid)
+
+        return room
 #
 #    def start(self):
 #        '''

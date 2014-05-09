@@ -35,40 +35,57 @@
 #  Description : manage plugins
 
 import sys
-import types
-from threading import Thread
-from Queue import Queue
-from importlib import import_module
-from inspect import isclass
-import re
-import json
+import os
+import logging
+from itertools import chain
 
-import zmq
-from zmq.eventloop import zmqstream
 from yapsy.PluginManager import PluginManager
 
-from engine import Message, Engine
-from session import Session
-import config
+from engine import Engine
 import log
 import holder
+import config
+
 
 logger = log.logger
 
+BUILTIN = str(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'builtin'
+
+
+def get_builtins(extra):
+    # adds the extra plugin dir from the setup for developers convenience
+    if extra:
+        if isinstance(extra, list):
+            return [BUILTIN] + extra
+        return [BUILTIN, extra]
+    else:
+        return [BUILTIN]
+
+
+class TomPluginManager(PluginManager):
+    """ plugin manager from yapsy for tom """
+    def __init__(self, push_socket):
+        super(TomPluginManager, self).__init__(categories_filter={'bot', Engine})
+        self.setPluginInfoExtension('plug')
+        self.push_socket = push_socket
+
+
+
 def init_plugin_manager():
-    global simple_plugin_manager
+    global tom_plugin_manager
 
     if not holder.plugin_manager:
-        simple_plugin_manager = PluginManager(catageries_filter={'bot', Engine})
-        simple_plugin_manager.setPluginInfoExtension('plug')
-        holder.plugin_manager = simple_plugin_manager
+        tom_plugin_manager = TomPluginManager(holder.broker_socket)
+        holder.plugin_manager = tom_plugin_manager
     else:
-        simple_plugin_manager = holder.plugin_manager
+        tom_plugin_manager = holder.plugin_manager
+
 
 init_plugin_manager()
 
+
 def get_plugin_by_name(name):
-    pta_item = simple_plugin_manager.getPluginByName(name, 'bots')
+    pta_item = tom_plugin_manager.getPluginByName(name, 'bots')
     if pta_item is None:
         return None
     return pta_item
@@ -78,45 +95,34 @@ def get_plugin_obj_by_name(name):
     plugin = get_plugin_by_name(name)
     return None if plugin is None else plugin.plugin_object
 
+
 def populate_doc(plugin):
     plugin_type = type(plugin.plugin_object)
     plugin_type.__errdoc__ = plugin_type.__doc__ if plugin_type.__doc__ else plugin.description
 
-def activate_plugin_with_version_check(name, config):
-    pta_item = simple_plugin_manager.getPluginByName(name, 'bots')
+
+def activate_plugin(name, config):
+    pta_item = tom_plugin_manager.getPluginByName(name, 'bots')
     if pta_item is None:
         logging.warning('Could not activate %s' % name)
         return None
+    obj = pta_item.plugin_object
 
-    try:
-        if obj.get_configuration_template() is not None and config is not None:
-            logging.debug('Checking configuration for %s...' % name)
-            obj.check_configuration(config)
-            logging.debug('Configuration for %s checked OK.' % name)
-        obj.configure(config)  # even if it is None we pass it on
-    except Exception as e:
-        logging.exception('Something is wrong with the configuration of the plugin %s' % name)
-        obj.config = None
-        raise PluginConfigurationException(str(e))
-    add_plugin_templates_path(pta_item.path)
     populate_doc(pta_item)
     try:
-        return simple_plugin_manager.activatePluginByName(name, "bots")
+        return tom_plugin_manager.activatePluginByName(name, "bots")
     except Exception as _:
         pta_item.activated = False  # Yapsy doesn't revert this in case of error
-        remove_plugin_templates_path(pta_item.path)
         logging.error("Plugin %s failed at activation stage, deactivating it..." % name)
-        simple_plugin_manager.deactivatePluginByName(name, "bots")
+        tom_plugin_manager.deactivatePluginByName(name, "bots")
         raise
 
 
 def deactivate_plugin_by_name(name):
-    pta_item = simple_plugin_manager.getPluginByName(name, 'bots')
-    remove_plugin_templates_path(pta_item.path)
+    pta_item = tom_plugin_manager.getPluginByName(name, 'bots')
     try:
-        return simple_plugin_manager.deactivatePluginByName(name, "bots")
+        return tom_plugin_manager.deactivatePluginByName(name, "bots")
     except Exception as _:
-        add_plugin_templates_path(pta_item.path)
         raise
 
 
@@ -137,35 +143,35 @@ def reload_plugin_by_name(name):
     plugin.plugin_object.__class__ = new_class
 
 
-
 def update_plugin_places(list):
-    from config import BOT_EXTRA_PLUGIN_DIR
+    BOT_EXTRA_PLUGIN_DIR = config.plugin_dirs
     builtins = get_builtins(BOT_EXTRA_PLUGIN_DIR)
     for entry in chain(builtins, list):
         if entry not in sys.path:
             sys.path.append(entry)  # so the plugins can relatively import their submodules
 
-    errors = [check_dependencies(path) for path in list]
-    errors = [error for error in errors if error is not None]
-    simple_plugin_manager.setPluginPlaces(chain(builtins, list))
+    tom_plugin_manager.setPluginPlaces(chain(builtins, list))
     all_candidates = []
 
     def add_candidate(candidate):
         all_candidates.append(candidate)
 
-    simple_plugin_manager.locatePlugins()
+    tom_plugin_manager.locatePlugins()
     #noinspection PyBroadException
     try:
-        simple_plugin_manager.loadPlugins(add_candidate)
+        tom_plugin_manager.loadPlugins(add_candidate)
     except Exception as _:
         logging.exception("Error while loading plugins")
+
+    # FIXME temporary keep it from errbot
+    errors = None
 
     return all_candidates, errors
 
 
 def get_all_plugins():
-    logging.debug("All plugins: %s" % simple_plugin_manager.getAllPlugins())
-    return simple_plugin_manager.getAllPlugins()
+    logging.debug("All plugins: %s" % tom_plugin_manager.getAllPlugins())
+    return tom_plugin_manager.getAllPlugins()
 
 
 def get_all_active_plugin_objects():
@@ -182,7 +188,7 @@ def get_all_plugin_names():
 
 def deactivate_all_plugins():
     for name in get_all_active_plugin_names():
-        simple_plugin_manager.deactivatePluginByName(name, "bots")
+        tom_plugin_manager.deactivatePluginByName(name, "bots")
 
 
 def global_restart():

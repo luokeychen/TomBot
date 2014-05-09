@@ -1,2 +1,1 @@
-#! /usr/bin/env sh
-python ../modules/brain/router.py
+

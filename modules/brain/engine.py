@@ -42,6 +42,7 @@ from Queue import Queue, Empty
 import textwrap
 import logging
 import os
+import re
 from threading import Timer, current_thread
 
 from helpers import make_msg
@@ -122,23 +123,6 @@ class Message(object):
         lines = textwrap.wrap(string, width=length)
         return lines
 
-    def _get_input(self):
-        session = Session(self.msg.id_, self.msg.user)
-        session['iswait'] = True
-
-        try:
-            message = queue.get(timeout=10)
-            user_input = message.content
-            session['iswait'] = False
-            session.save()
-            return user_input
-        except Empty:
-            session['iswait'] = False
-            session.save()
-
-        session['iswait'] = False
-        session.save()
-        msg.send('由于未知原因，无法读取用户输入')
 
     def get_type(self):
         return self.type_
@@ -379,26 +363,6 @@ class Engine(EngineBase):
         for example: "1.2.2"
         """
         return None
-
-    def get_configuration_template(self):
-        """ If your plugin needs a configuration, override this method and return a configuration template.
-        for example a dictionary like:
-        return {'LOGIN' : 'example@example.com', 'PASSWORD' : 'password'}
-        Note : if this method returns None, the plugin won't be configured
-        """
-        return None
-
-    def check_configuration(self, configuration):
-        """ By default, this method will do only a BASIC check. You need to override it if you want to do more complex checks.
-        It will be called before the configure callback. Note if the config_template is None, it will never be called
-        It means recusively:
-        1. in case of a dictionary, it will check if all the entries and from the same type are there and not more
-        2. in case of an array or tuple, it will assume array members of the same type of first element of the template (no mix typed is supported)
-
-        In case of validation error it should raise a errbot.utils.ValidationException
-
-        """
-        recurse_check_structure(self.get_configuration_template(), configuration)  # default behavior
 
     def configure(self, configuration):
         """ By default, it will just store the current configuation in the self.config field of your plugin

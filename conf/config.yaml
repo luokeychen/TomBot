@@ -16,6 +16,7 @@ backend:
     # 是否调试模式
     debug: True
     workers: 1
+    max_message_size: 4096
     
 
 broker: 
