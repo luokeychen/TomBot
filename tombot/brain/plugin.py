@@ -198,21 +198,21 @@ def global_restart():
 
 #     def load_scripts(self, type_):
 #         '''载入插件 '''
-#         scripts = None
+#         plugins = None
 #         if type_ == 'plugin':
-#             scripts = config.plugins
+#             plugins = config.plugins
 #         if type_ == 'ansible':
-#             scripts = config.runners
+#             plugins = config.runners
 
-#         if scripts is None:
+#         if plugins is None:
 #             return
 
-#         for plugin in scripts:
+#         for plugin in plugins:
 #             self.run_script(plugin)
 
 #     def run_script(self, plugin):
 #         '''载入运行插件，同时将插件注册到PluginManager'''
-#         sys.path.append('scripts')
+#         sys.path.append('plugins')
 #         sys.path.append('{0}/tombot/ansible/'.format(config.home))
 
 #         try:

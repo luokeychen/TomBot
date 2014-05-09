@@ -1,0 +1,9 @@
+[Core]
+Name = ping
+Module = ping
+
+[Documentation]
+Description = to make sure Tom is working
+
+[Python]
+Version = 2+

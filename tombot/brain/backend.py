@@ -78,12 +78,12 @@ logger = log.logger
 class Backend(object):
     HISTORY = defaultdict(lambda: deque(maxlen=10))
 
-    MSG_ERROR_OCCURRED = 'Sorry for your inconvenience. '\
+    MSG_ERROR_OCCURRED = 'Sorry for your inconvenience. ' \
                          'An unexpected error occurred.'
     MESSAGE_SIZE_LIMIT = config.max_message_size
-    MSG_UNKNOWN_COMMAND = 'Unknown command: "%(command)s". '\
+    MSG_UNKNOWN_COMMAND = 'Unknown command: "%(command)s". ' \
                           'Type "' + config.name + 'help" for available commands.'
-    MSG_HELP_TAIL = 'Type help <command name> to get more info '\
+    MSG_HELP_TAIL = 'Type help <command name> to get more info ' \
                     'about that specific command.'
     MSG_HELP_UNDEFINED_COMMAND = 'That command is not defined.'
 
@@ -110,6 +110,7 @@ class Backend(object):
 
         if config.backend_count:
             from ..common.threadpool import ThreadPool
+
             self.thread_pool = ThreadPool(config.backend_count)
             logger.debug('Created the thread pool {0}'.format(self.thread_pool))
 
@@ -128,7 +129,7 @@ class Backend(object):
     @staticmethod
     def send_simple_reply(message, text):
         message.send(text)
-    
+
     def serve_forever(self):
         pass
 
@@ -148,6 +149,7 @@ class Backend(object):
             room = self.room_manager.get_room(rid)
 
         return room
+
 #
 #    def start(self):
 #
@@ -161,32 +163,6 @@ class Backend(object):
 #        self.pm.start()
 #        logger.info('脚本载入完成')
 #        logger.info('backend准备开始监听')
-#
-#        def _special_hack():
-#            '''特殊情况处理'''
-#            pass
-#
-#        def _change_mode(content, room):
-#            #模式切换特殊处理
-#            msg = None
-#            if content == 'tom mode cmd':
-#                room.mode = 'command'
-#                logger.info('切换到command模式')
-#
-#                msg = self.make_simple_msg(content='notify Tom已切换到command模式，' +
-#                                    '所有英文开头的指令都将被当作命令执行')
-#
-#            if content == 'tom mode normal':
-#                room.mode = 'normal'
-#                logger.info('切换到normal模式')
-#                msg = self.make_simple_msg(content='notify Tom已切换到normal模式')
-#
-#            if content == 'tom mode easy':
-#                room.mode = 'easy'
-#                logger.info('切换到easy模式')
-#                msg = self.make_simple_msg(content='notify Tom已切换到easy模式，' +
-#                                    '指令将不需要Tom前缀，但会忽略中文')
-#            return msg
 #
 #        def callback(msg):
 #            logger.debug('从adapter收到消息: {0}'.format(msg))
