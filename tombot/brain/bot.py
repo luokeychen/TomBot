@@ -38,12 +38,15 @@ __author__ = 'Konglx'
 
 
 class TomBot(Backend, StoreMixin):
+    __tomdoc__ = """ Commands related to the bot administration """
     startup_time = datetime.now()
 
     def __init__(self, *args, **kwargs):
+        self.loop = ioloop.IOLoop().instance()
         data_dir = config.home + '/run/'
         self.open_storage(data_dir + 'bot.db')
         self.prefix = config.name
+        self.all_candidates = None
         super(TomBot, self).__init__(*args, **kwargs)
 
         # def update_dynamic_plugins(self):
@@ -54,32 +57,30 @@ class TomBot(Backend, StoreMixin):
         self.inject_commands_from(self)
 
     def serve_forever(self):
-        loop = ioloop.IOLoop().instance()
         stream = zmqstream.ZMQStream(holder.broker_socket)
 
         stream.on_recv(self.callback_message)
 
         try:
-            loop.start()
+            self.loop.start()
         except KeyboardInterrupt:
             logger.info('Keyboard Interrupt, program will exit now.')
-            loop.stop()
+            self.shutdown()
 
     def send_message(self, mess):
-        super(TomBot, self).send_message(mess)
+        # super(TomBot, self).send_message(mess)
         # Act only in the backend tells us that this message is OK to broadcast
         for bot in get_all_active_plugin_objects():
             #noinspection PyBroadException
             try:
-                bot.callback_botmessage(mess)
+                bot.callback_message(mess)
             except Exception as _:
-                logger.exception("Crash in a callback_botmessage handler")
+                logger.exception("Crash in a callback_message handler")
 
     def callback_message(self, message):
-        logger.debug('Revieve message from client: {}'.format(message[0]))
+        logger.debug('Receive message from client: {}'.format(message[0]))
         logger.debug('Full message body: {}'.format(message))
         msg_obj = Message(message, holder.broker_socket)
-        logger.debug('Full message body:{}'.format(message))
         if super(TomBot, self).callback_message(msg_obj):
             # Act only in the backend tells us that this message is OK to broadcast
             for plugin in get_all_active_plugin_objects():
@@ -89,42 +90,6 @@ class TomBot(Backend, StoreMixin):
                     plugin.callback_message(message)
                 except Exception as _:
                     logger.exception("Crash in a callback_message handler")
-
-    def callback_contact_online(self, conn, pres):
-        for bot in get_all_active_plugin_objects():
-            #noinspection PyBroadException
-            try:
-                logger.debug('Callback %s' % bot)
-                bot.callback_contact_online(conn, pres)
-            except Exception as _:
-                logger.exception('Crash in the callback_contact_online handler.')
-
-    def callback_contact_offline(self, conn, pres):
-        for bot in get_all_active_plugin_objects():
-            #noinspection PyBroadException
-            try:
-                logger.debug('Callback %s' % bot)
-                bot.callback_contact_offline(conn, pres)
-            except Exception as _:
-                logger.exception('Crash in the callback_contact_offline handler.')
-
-    def callback_user_joined_chat(self, conn, pres):
-        for bot in get_all_active_plugin_objects():
-            #noinspection PyBroadException
-            try:
-                logger.debug('Callback %s' % bot)
-                bot.callback_user_joined_chat(conn, pres)
-            except Exception as _:
-                logger.exception('Crash in the callback_user_joined_chat handler.')
-
-    def callback_user_left_chat(self, conn, pres):
-        for bot in get_all_active_plugin_objects():
-            #noinspection PyBroadException
-            try:
-                logger.debug('Callback %s' % bot)
-                bot.callback_user_left_chat(conn, pres)
-            except Exception as _:
-                logger.exception('Crash in the callback_user_left_chat handler.')
 
     def activate_non_started_plugins(self):
         logger.info('Activating all the plugins...')
@@ -145,6 +110,50 @@ class TomBot(Backend, StoreMixin):
             self.warn_admins(errors)
             logger.exception(errors)
         return errors
+
+    def activate_plugin(self, name):
+        try:
+            if name in get_all_active_plugin_names():
+                return "Plugin already in active list"
+            if name not in get_all_plugin_names():
+                return "I don't know this %s plugin" % name
+            activate_plugin_by_name(name)
+        except Exception as e:
+            logger.exception("Error loading %s" % name)
+            return '%s failed to start : %s\n' % (name, e)
+        get_plugin_obj_by_name(name).callback_connect()
+        return "Plugin %s activated" % name
+
+    def deactivate_plugin(self, name):
+        if name not in get_all_active_plugin_names():
+            return "Plugin %s not in active list" % name
+        deactivate_plugin_by_name(name)
+        return "Plugin %s deactivated" % name
+
+    # plugin blacklisting management
+    def get_blacklisted_plugin(self):
+        return self.get(BL_PLUGINS, [])
+
+    def is_plugin_blacklisted(self, name):
+        return name in self.get_blacklisted_plugin()
+
+    def blacklist_plugin(self, name):
+        if self.is_plugin_blacklisted(name):
+            logger.warning('Plugin %s is already blacklisted' % name)
+            return 'Plugin %s is already blacklisted' % name
+        self[BL_PLUGINS] = self.get_blacklisted_plugin() + [name]
+        logger.info('Plugin %s is now blacklisted' % name)
+        return 'Plugin %s is now blacklisted' % name
+
+    def unblacklist_plugin(self, name):
+        if not self.is_plugin_blacklisted(name):
+            logger.warning('Plugin %s is not blacklisted' % name)
+            return 'Plugin %s is not blacklisted' % name
+        l = self.get_blacklisted_plugin()
+        l.remove(name)
+        self[BL_PLUGINS] = l
+        logger.info('Plugin %s removed from blacklist' % name)
+        return 'Plugin %s removed from blacklist' % name
 
     def update_dynamic_plugins(self):
         all_candidates, errors = update_plugin_places(config.plugin_dirs)
@@ -176,9 +185,11 @@ class TomBot(Backend, StoreMixin):
         deactivate_all_plugins()
 
     def shutdown(self):
-        logger.info('Shutdown.')
+        logger.info('Shutting down...')
+        deactivate_all_plugins()
         self.close_storage()
-        logger.info('Bye.')
+        self.loop.stop()
+        logger.info('Shutdown complete. Bye')
 
     @staticmethod
     def formatted_plugin_list(active_only=True):
@@ -196,7 +207,7 @@ class TomBot(Backend, StoreMixin):
         return "\n".join(("• " + plugin for plugin in all_plugins))
 
     #noinspection PyUnusedLocal
-    @botcmd(template='status')
+    @botcmd
     def status(self, mess, args):
         """ If I am alive I should be able to respond to this one
         """
@@ -239,8 +250,8 @@ class TomBot(Backend, StoreMixin):
     def uptime(self, mess, args):
         """ Return the uptime of the bot
         """
-        return "I've been up for %s %s (since %s)" % (args, format_timedelta(datetime.now() - self.startup_time),
-                                                      datetime.strftime(self.startup_time, '%A, %b %d at %H:%M'))
+        return "Tom have been up for %s %s (since %s)" % (args, format_timedelta(datetime.now() - self.startup_time),
+                                                          datetime.strftime(self.startup_time, '%A, %b %d at %H:%M'))
 
     #noinspection PyUnusedLocal
     @botcmd(admin_only=True)
@@ -248,54 +259,10 @@ class TomBot(Backend, StoreMixin):
         """ restart the bot """
         mess.send(mess.from_id, "Deactivating all the plugins...")
         deactivate_all_plugins()
-        mess.send(mess.from_id(), "Restarting")
+        mess.send(mess.from_id, "Restarting")
         self.shutdown()
         global_restart()
         return "I'm restarting..."
-
-    def activate_plugin(self, name):
-        try:
-            if name in get_all_active_plugin_names():
-                return "Plugin already in active list"
-            if name not in get_all_plugin_names():
-                return "I don't know this %s plugin" % name
-            activate_plugin_by_name(name, self.get_plugin_configuration(name))
-        except Exception as e:
-            logger.exception("Error loading %s" % name)
-            return '%s failed to start : %s\n' % (name, e)
-        get_plugin_obj_by_name(name).callback_connect()
-        return "Plugin %s activated" % name
-
-    def deactivate_plugin(self, name):
-        if name not in get_all_active_plugin_names():
-            return "Plugin %s not in active list" % name
-        deactivate_plugin_by_name(name)
-        return "Plugin %s deactivated" % name
-
-    # plugin blacklisting management
-    def get_blacklisted_plugin(self):
-        return self.get(BL_PLUGINS, [])
-
-    def is_plugin_blacklisted(self, name):
-        return name in self.get_blacklisted_plugin()
-
-    def blacklist_plugin(self, name):
-        if self.is_plugin_blacklisted(name):
-            logger.warning('Plugin %s is already blacklisted' % name)
-            return 'Plugin %s is already blacklisted' % name
-        self[BL_PLUGINS] = self.get_blacklisted_plugin() + [name]
-        logger.info('Plugin %s is now blacklisted' % name)
-        return 'Plugin %s is now blacklisted' % name
-
-    def unblacklist_plugin(self, name):
-        if not self.is_plugin_blacklisted(name):
-            logger.warning('Plugin %s is not blacklisted' % name)
-            return 'Plugin %s is not blacklisted' % name
-        l = self.get_blacklisted_plugin()
-        l.remove(name)
-        self[BL_PLUGINS] = l
-        logger.info('Plugin %s removed from blacklist' % name)
-        return 'Plugin %s removed from blacklist' % name
 
     #noinspection PyUnusedLocal
     @botcmd(admin_only=True)
@@ -332,6 +299,15 @@ class TomBot(Backend, StoreMixin):
         reload_plugin_by_name(args)
         r = self.activate_plugin(args)
         return r
+
+    @botcmd
+    def more(self, mess, args):
+        """
+        command to implement paging
+        :param mess:
+        :param args:
+        """
+        pass
 
     #noinspection PyUnusedLocal
     @botcmd(admin_only=True)
@@ -390,9 +366,9 @@ class TomBot(Backend, StoreMixin):
             description = 'Available help:\n'
             command_classes = sorted(set(self.get_command_classes()), key=lambda c: c.__name__)
             usage = '\n'.join(
-                self.prefix + 'help %s: %s' % (clazz.__name__, clazz.__errdoc__ or '(undocumented)') for clazz in
+                self.prefix + '%s: %s' % (clazz.__name__, clazz.__tomdoc__ or '(undocumented)') for clazz in
                 command_classes)
-        elif args == 'full':
+        elif args == 'all':
             description = 'Available commands:'
 
             clazz_commands = {}
@@ -405,10 +381,10 @@ class TomBot(Backend, StoreMixin):
                     clazz_commands[clazz] = commands
 
             for clazz in sorted(set(clazz_commands), key=lambda c: c.__name__):
-                usage += '\n\n%s: %s\n' % (clazz.__name__, clazz.__errdoc__ or '')
+                usage += '\n\n%s: %s\n' % (clazz.__name__, clazz.__tomdoc__ or '')
                 usage += '\n'.join(sorted([
-                    '\t' + self.prefix + '%s: %s' % (name.replace('_', ' ', 1),
-                                                     (self.get_doc(command).strip()).split('\n', 1)[0])
+                    '\t' + self.prefix + ' %s: %s' % (name.replace('_', ' ', 1),
+                                                      (self.get_doc(command).strip()).split('\n', 1)[0])
                     for (name, command) in clazz_commands[clazz]
                     if name != 'help' and not command._tom_command_hidden
                     # and (not config.hide_restrict_command or self.check_command_access(mess, name)[0])
@@ -421,8 +397,8 @@ class TomBot(Backend, StoreMixin):
                         get_class_that_defined_method(command).__name__ == args]
             description = 'Available commands for %s:\n\n' % args
             usage += '\n'.join(sorted([
-                '\t' + self.prefix + '%s: %s' % (name.replace('_', ' ', 1),
-                                                 (self.get_doc(command).strip()).split('\n', 1)[0])
+                '\t' + self.prefix + ' %s: %s' % (name.replace('_', ' ', 1),
+                                                  (self.get_doc(command).strip()).split('\n', 1)[0])
                 for (name, command) in commands
                 if not command._tom_command_hidden and (not config.hide_restrict_command)
                 # and (not config.hide_restrict_command or self.check_command_access(mess, name)[0])
@@ -482,7 +458,7 @@ class TomBot(Backend, StoreMixin):
                 '\t' + self.prefix + '%s: %s' % (
                     name.replace('_', ' ', 1), (command.__doc__ or '(undocumented)').strip().split('\n', 1)[0])
                 for (name, command) in clazz_commands[clazz] if
-                args is not None and command.__doc__ is not None and args.lower() in command.__doc__.lower() and name != 'help' and not command._err_command_hidden
+                args is not None and command.__doc__ is not None and args.lower() in command.__doc__.lower() and name != 'help' and not command._tom_command_hidden
             ]))
         usage += '\n\n'
 

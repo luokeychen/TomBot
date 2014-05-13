@@ -34,14 +34,12 @@
 #  Date        : 2014-04-27
 #  Description :
 
-from engine import Respond
+from tombot import BuiltinEngine
+from tombot import botcmd
 
-respond = Respond()
 
-
-class More(object):
-    respond.register('more .*')
-
+class More(BuiltinEngine):
+    @botcmd
     def more(self, message, matches):
         message.send('Type more to see rest content.')
         user_input = respond.get_input()

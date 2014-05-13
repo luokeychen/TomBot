@@ -42,10 +42,11 @@ import datetime
 import pickle
 import base64
 
-from tombot.common import log, config
+from tombot.common import log, config, utils
 
 
 logger = log.logger
+
 
 # from webpy
 class Store(object):
@@ -137,6 +138,43 @@ KeyError: 'a'
                 os.remove(path)
 
 
+class ShelfStore(object):
+    """Store for saving session using `shelve` module.
+
+import shelve
+store = ShelfStore(shelve.open('session.shelf'))
+
+XXX: is shelve thread-safe?
+"""
+
+    def __init__(self, shelf):
+        self.shelf = shelf
+
+    def __contains__(self, key):
+        return key in self.shelf
+
+    def __getitem__(self, key):
+        atime, v = self.shelf[key]
+        self[key] = v  # update atime
+        return v
+
+    def __setitem__(self, key, value):
+        self.shelf[key] = time.time(), value
+
+    def __delitem__(self, key):
+        try:
+            del self.shelf[key]
+        except KeyError:
+            pass
+
+    def cleanup(self, timeout):
+        now = time.time()
+        for k in self.shelf.keys():
+            atime, v = self.shelf[k]
+            if now - atime > timeout:
+                del self[k]
+
+
 class DBStore(Store):
     """Store for saving a session in database
 Needs a table with the following columns:
@@ -185,20 +223,19 @@ class SessionExpired(Exception):
     pass
 
 
-def get_session_from_file(session_id):
-    with open('{0}/run/sessions/{1}.session'.format(os.getenv('TOMBOT_HOME'),
-                                                    session_id), 'r') as fp:
-        pickled = fp.read()
-    return jsonpickle.decode(pickled)
+# store = DiskStore('{0}/run/sessions'.format(os.getenv('TOMBOT_HOME')))
+import shelve
 
-
-store = DiskStore('{0}/run/sessions'.format(os.getenv('TOMBOT_HOME')))
+store = ShelfStore(shelve.open('{0}/run/session.db'.format(config.home)))
 
 
 class Session(object):
-    '''基于Room和User的session'''
+    """
+    Session implemention based on Room and User
+    """
     __slots__ = [
         'store',
+        '_killed',
         '_data',
         'session_id',
         '__getitem__',
@@ -207,12 +244,12 @@ class Session(object):
     ]
 
     def __init__(self, rid, uid):
-        #         self._data = utils.threadeddict()
+        self._data = utils.threadeddict()
+        self._killed = False
         self.session_id = self.generate_session_id(rid, uid)
-        #         self._killed = False
-        self._data = dict()
+        # self._data = dict()
         self._data['session_id'] = self.generate_session_id(rid, uid)
-        self._data['iswait'] = False
+        self._data['is_wait'] = False
         self._data['rid'] = rid
         self._data['uid'] = uid
         self._data['last'] = None
@@ -224,12 +261,9 @@ class Session(object):
         self.__setitem__ = self._data.__setitem__
         self.__delitem__ = self._data.__delitem__
 
-        if self.store[self.session_id]:
-            logger.info('载入session，session_id:{0}'.format(self.session_id))
-            self._load()
-        else:
-            logger.info('新建session，session_id:{0}'.format(self.session_id))
-            self.save()
+        self._load()
+        self._save()
+
 
     def __contains__(self, name):
         return name in self._data
@@ -246,7 +280,7 @@ class Session(object):
     def __delattr__(self, name):
         delattr(self._data, name)
 
-    def save(self):
+    def _save(self):
         if not self.get('_killed'):
             self.store[self.session_id] = dict(self._data)
 
@@ -261,9 +295,8 @@ class Session(object):
         return session_id
 
     def kill(self):
+        del self.store[self.session_id]
         self._killed = True
-        self._save()
-        raise SessionExpired
 
 
 plugin_store = DiskStore('{0}/run/sessions'.format(os.getenv('TOMBOT_HOME')))

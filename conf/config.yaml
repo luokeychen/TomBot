@@ -16,7 +16,7 @@ backend:
     ipc_path: /home/konglx/project/TomBot/run/ipc
     # 是否调试模式
     debug: True
-    workers: 1
+    workers: 5
     max_message_size: 4096
     hide_restrict_command: True
     bot_alt_prefixes:

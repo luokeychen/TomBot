@@ -112,8 +112,14 @@ def get_plugin_obj_by_name(name):
 
 
 def populate_doc(plugin):
+    """
+
+    :param plugin: plugin to add doc
+    """
+    # TODO make docstring with method scope
     plugin_type = type(plugin.plugin_object)
-    plugin_type.__errdoc__ = plugin_type.__doc__ if plugin_type.__doc__ else plugin.description
+    # plugin_type.__tomdoc__ = plugin_type.__doc__ if plugin_type.__doc__ else plugin.description
+    plugin_type.__tomdoc__ = plugin.description if plugin.description else plugin_type.__doc__
 
 
 def activate_plugin_by_name(name):
@@ -205,7 +211,7 @@ def get_all_plugin_names():
 
 def deactivate_all_plugins():
     for name in get_all_active_plugin_names():
-        tom_plugin_manager.deactivatePluginByName(name, "bots")
+        tom_plugin_manager.deactivatePluginByName(name, "User")
 
 
 def global_restart():

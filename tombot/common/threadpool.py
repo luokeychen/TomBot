@@ -181,7 +181,7 @@ class WorkRequest(object):
 
     """
 
-    def __init__(self, callable_, args=None, kwds=None, requestID=None,
+    def __init__(self, callable_, args=None, kwds=None, request_id=None,
                  callback=None, exc_callback=_handle_thread_exception):
         """Create a work request for a callable and attach callbacks.
 
@@ -203,18 +203,18 @@ class WorkRequest(object):
         ``traceback.print_exception``. If you want no exception handler
         callback, just pass in ``None``.
 
-        ``requestID``, if given, must be hashable since it is used by
+        ``request_id``, if given, must be hashable since it is used by
         ``ThreadPool`` object to store the results of that work request in a
         dictionary. It defaults to the return value of ``id(self)``.
 
         """
-        if requestID is None:
+        if request_id is None:
             self.request_id = id(self)
         else:
             try:
-                self.request_id = hash(requestID)
+                self.request_id = hash(request_id)
             except TypeError:
-                raise TypeError("requestID must be hashable.")
+                raise TypeError("request_id must be hashable.")
         self.exception = False
         self.callback = callback
         self.exc_callback = exc_callback
@@ -323,7 +323,7 @@ class ThreadPool(object):
                     # hand results to callback, if any
                 if request.callback and not (request.exception and request.exc_callback):
                     request.callback(request, result)
-                del self.work_requests[request.requestID]
+                del self.work_requests[request.request_id]
             except Empty:
                 break
 

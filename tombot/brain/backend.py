@@ -57,28 +57,6 @@ _path = os.path.abspath(os.path.dirname(__file__))
 
 logger = log.logger
 
-
-# class BackendManager(object):
-#     def __init__(self):
-#         self.backends = []
-#         self.count = 0
-#
-#     def add(self):
-#         b = Backend(self.count)
-#         p = Process(target=b.start)
-#         p.daemon = False
-#         p.start()
-#         self.backends.append(p)
-#         self.count += 1
-#         logger.debug('Backends: {0}'.format(self.backends))
-#
-#     def delete(self):
-#         '''不允许指定删除的backend序号'''
-#         p = self.backends[self.count]
-#         p.terminate()
-#         self.backends.remove(self.count)
-#         self.count -= 1
-
 # def check_command_access(self, mess, cmd):
 #     """
 #     Check command against ACL rules
@@ -115,6 +93,7 @@ logger = log.logger
 #         if usr not in BOT_ADMINS:
 #             raise ACLViolation("This command requires bot-admin privileges")
 
+
 class Backend(object):
     cmd_history = defaultdict(lambda: deque(maxlen=10))
 
@@ -145,7 +124,6 @@ class Backend(object):
         backend = context.socket(zmq.PUB)
         backend.bind('ipc://{0}/backend.ipc'.format(config.ipc_path))
 
-        # 把名字过滤掉，再转发给scripts，以便脚本正确的处理订阅字符串
         self.room_manager = RoomManager()
 
         logger.info('Starting to load plugins...')
@@ -161,15 +139,10 @@ class Backend(object):
         self.bot_name = tuple(name.lower() for name in config.name)
 
     def get_commands(self):
-        return self.commands, self.re_commands
+        return self.commands
 
-    def forward_message(self):
-        """
-        pass message to broker, or with special deals
-
-        :rtype : None
-        """
-        pass
+    def get_re_commands(self):
+        return self.re_commands
 
     def unknown_command(self, mess, cmd, args):
         """ Override the default unknown command behavior
@@ -198,6 +171,7 @@ class Backend(object):
         override for special username convertion
         :param mess: Message object
         """
+        # TODO Make it possible to convert from uin to QQ number.
         return mess.from_id
 
     def callback_message(self, mess):
@@ -205,13 +179,14 @@ class Backend(object):
         Needs to return False if we want to stop further treatment
         """
         # Prepare to handle either private chats or group chats
+
         type = mess.msg_type
         from_id = mess.from_id
-        text = mess.content
+        content = mess.content
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
 
-        # if type not in ("groupchat", "chat"):
+        # 3 types of QQ chat, there's sess type for non-friend talk, but with security issue, don't use it
         if type not in ('buddy', 'group', 'discu'):
             logger.warn("unhandled message type %s" % mess)
             return False
@@ -219,18 +194,18 @@ class Backend(object):
         logger.debug("*** from_id = %s" % from_id)
         logger.debug("*** username = %s" % username)
         logger.debug("*** type = %s" % type)
-        logger.debug("*** text = %s" % text)
+        logger.debug("*** content = %s" % content)
 
         # If a message format is not supported (eg. encrypted),
         # txt will be None
-        if not text:
+        if not content:
             return False
 
         suppress_cad_not_found = False
 
-        prefixed = False  # Keeps track whether text was prefixed with a bot prefix
-        only_check_re_command = False  # Becomes true if text is determed to not be a regular command
-        tomatch = text.lower()
+        prefixed = False  # Keeps track whether content was prefixed with a bot prefix
+        only_check_re_command = False  # Becomes true if content is determed to not be a regular command
+        tomatch = content.lower()
         if len(self.bot_alt_prefixes) > 0 and tomatch.startswith(self.bot_name):
             # Yay! We were called by one of our alternate prefixes. Now we just have to find out
             # which one... (And find the longest matching, in case you have 'err' and 'errbot' and
@@ -242,24 +217,24 @@ class Backend(object):
                 l = len(prefix)
                 if tomatch.startswith(prefix) and l > longest:
                     longest = l
-            logger.debug("Called with alternate prefix '{}'".format(text[:longest]))
-            text = text[longest:]
+            logger.debug("Called with alternate prefix '{}'".format(content[:longest]))
+            content = content[longest:]
 
-            # Now also remove the separator from the text
+            # Now also remove the separator from the content
             for sep in config.bot_alt_separators:
                 # While unlikely, one may have separators consisting of
                 # more than one character
                 l = len(sep)
-                if text[:l] == sep:
-                    text = text[l:]
-        elif not text.startswith(self.bot_name):
+                if content[:l] == sep:
+                    content = content[l:]
+        elif not content.startswith(self.bot_name):
             only_check_re_command = True
-        if text.startswith(self.bot_name):
-            text = text[len(self.bot_name):]
+        if content.startswith(self.bot_name):
+            content = content[len(self.bot_name):]
             prefixed = True
 
-        text = text.strip()
-        text_split = text.split(' ')
+        content = content.strip()
+        text_split = content.split(' ')
         cmd = None
         command = None
         args = ''
@@ -300,15 +275,15 @@ class Backend(object):
                             if not self.re_commands[k]._tom_command_prefix_required}
 
             for name, func in commands.items():
-                match = func._tom_command_re_pattern.search(text)
+                match = func._tom_command_re_pattern.search(content)
                 if match:
                     logger.debug("Matching '{}' against '{}' produced a match"
-                                 .format(text, func._tom_command_re_pattern.pattern))
+                                 .format(content, func._tom_command_re_pattern.pattern))
                     matched_on_re_command = True
-                    self._process_command(mess, name, text, match)
+                    self._process_command(mess, name, content, match)
                 else:
                     logger.debug("Matching '{}' against '{}' produced no match"
-                                 .format(text, func._tom_command_re_pattern.pattern))
+                                 .format(content, func._tom_command_re_pattern.pattern))
         if matched_on_re_command:
             return True
 
@@ -337,7 +312,7 @@ class Backend(object):
         if (cmd, args) in user_cmd_history:
             user_cmd_history.remove((cmd, args))  # Avoids duplicate history items
 
-        # There's no ACL control at this time
+        # FIXME There's no ACL control at this time
         # try:
         #     self.check_command_access(mess, cmd)
         # except ACLViolation as e:
