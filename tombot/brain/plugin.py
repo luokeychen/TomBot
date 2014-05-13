@@ -32,8 +32,8 @@
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-29
-#  Description : manage plugins
-# TODO make ansible and builtin and user plugins separately
+#  Description : manage user
+# TODO make ansible and builtin and user user separately
 
 import sys
 import os
@@ -69,9 +69,9 @@ def init_plugin_manager():
         tom_plugin_manager = PluginManager()
         tom_plugin_manager.setPluginPlaces(config.plugin_dirs)
         tom_plugin_manager.setPluginInfoExtension('plug')
-        # 3 types of plugins, Built-in for plugin come with Tom,
+        # 3 types of user, Built-in for plugin come with Tom,
         # Ansible for ansible simplerunner or playbook running on tom
-        # User for user-defined plugins
+        # User for user-defined user
         tom_plugin_manager.setCategoriesFilter({
             'Built-in': BuiltinEngine,
             'Ansible': AnsibleEngine,
@@ -100,7 +100,11 @@ init_plugin_manager()
 
 
 def get_plugin_by_name(name):
-    pta_item = tom_plugin_manager.getPluginByName(name, 'bots')
+    user_item = tom_plugin_manager.getPluginByName(name, 'User')
+    builtin_item = tom_plugin_manager.getPluginByName(name, 'Built-in')
+    ansible_item = tom_plugin_manager.getPluginByName(name, 'Ansible')
+
+    pta_item = user_item or builtin_item or ansible_item
     if pta_item is None:
         return None
     return pta_item
@@ -123,28 +127,27 @@ def populate_doc(plugin):
 
 
 def activate_plugin_by_name(name):
-    pta_item = tom_plugin_manager.getPluginByName(name, 'User')
-    # pta_item = tom_plugin_manager.getPluginByName(name, 'Built-in')
-    # pta_item = tom_plugin_manager.getPluginByName(name, 'Ansible')
+    pta_item = get_plugin_by_name(name)
     if pta_item is None:
         logger.warning('Could not activate %s' % name)
         return None
-    obj = pta_item.plugin_object
+    # obj = pta_item.plugin_object
 
     populate_doc(pta_item)
     try:
-        return tom_plugin_manager.activatePluginByName(name, "User")
+        return tom_plugin_manager.activatePluginByName(name, pta_item.category)
     except Exception as _:
         pta_item.activated = False  # Yapsy doesn't revert this in case of error
         logger.error("Plugin %s failed at activation stage, deactivating it..." % name)
-        tom_plugin_manager.deactivatePluginByName(name, "User")
+        tom_plugin_manager.deactivatePluginByName(name, pta_item.category)
         raise
 
 
 def deactivate_plugin_by_name(name):
-    pta_item = tom_plugin_manager.getPluginByName(name, 'User')
+    pta_item = get_plugin_by_name(name)
+    # obj = pta_item.plugin_object
     try:
-        return tom_plugin_manager.deactivatePluginByName(name, "User")
+        return tom_plugin_manager.deactivatePluginByName(name, pta_item.category)
     except Exception as _:
         raise
 
@@ -171,7 +174,7 @@ def update_plugin_places(list):
     builtins = get_builtins(BOT_EXTRA_PLUGIN_DIR)
     for entry in chain(builtins, list):
         if entry not in sys.path:
-            sys.path.append(entry)  # so the plugins can relatively import their submodules
+            sys.path.append(entry)  # so the user can relatively import their submodules
 
     tom_plugin_manager.setPluginPlaces(chain(builtins, list))
     all_candidates = []
@@ -184,7 +187,7 @@ def update_plugin_places(list):
     try:
         tom_plugin_manager.loadPlugins(add_candidate)
     except Exception as _:
-        logger.exception("Error while loading plugins")
+        logger.exception("Error while loading user")
 
     # FIXME temporary keep it from errbot
     errors = None
@@ -193,7 +196,7 @@ def update_plugin_places(list):
 
 
 def get_all_plugins():
-    logger.debug("All plugins: %s" % tom_plugin_manager.getAllPlugins())
+    logger.debug("All user: %s" % tom_plugin_manager.getAllPlugins())
     return tom_plugin_manager.getAllPlugins()
 
 
@@ -211,7 +214,7 @@ def get_all_plugin_names():
 
 def deactivate_all_plugins():
     for name in get_all_active_plugin_names():
-        tom_plugin_manager.deactivatePluginByName(name, "User")
+        deactivate_plugin_by_name(name)
 
 
 def global_restart():
@@ -226,27 +229,27 @@ def global_restart():
 #         self.backend = None
 #         self.pushsock = pushsock
 #         self.identity = identity
-#         self.plugins = {}
+#         self.user = {}
 
 #         self.daemon = False
 
 #     def load_scripts(self, type_):
 #         '''载入插件 '''
-#         plugins = None
+#         user = None
 #         if type_ == 'plugin':
-#             plugins = config.plugins
+#             user = config.user
 #         if type_ == 'ansible':
-#             plugins = config.runners
+#             user = config.runners
 
-#         if plugins is None:
+#         if user is None:
 #             return
 
-#         for plugin in plugins:
+#         for plugin in user:
 #             self.run_script(plugin)
 
 #     def run_script(self, plugin):
 #         '''载入运行插件，同时将插件注册到PluginManager'''
-#         sys.path.append('plugins')
+#         sys.path.append('user')
 #         sys.path.append('{0}/tombot/ansible/'.format(config.home))
 
 #         try:
@@ -260,10 +263,10 @@ def global_restart():
 #             载入所有插件类
 #             if isclass(attr) and hasattr(attr, '__plugin__'):
 #                 _instance = attr()
-#                 self.plugins[plugin] = Plugin(_instance, m)
-#                 self.plugins[plugin].plugin_manager = self
+#                 self.user[plugin] = Plugin(_instance, m)
+#                 self.user[plugin].plugin_manager = self
 #                 logger.info('实例化脚本{0}的{1}类...'.format(plugin, attr.__name__))
-#         logger.info('成功载入的插件:{0}'.format(self.plugins.keys()))
+#         logger.info('成功载入的插件:{0}'.format(self.user.keys()))
 
 #     def recv_callback(self, msg):
 #         '''收到消息的回调'''
@@ -286,7 +289,7 @@ def global_restart():
 #     def parse_command(self, msg, session=None):
 #         '''找到插件里的响应函数，并进行处理'''
 #         match_result = {}
-#         for name, plugin in self.plugins.iteritems():
+#         for name, plugin in self.user.iteritems():
 #             match_result[name] = plugin.respond(msg, session)
 #             if match_result[name] == '__I_AM_WAITING__':
 #                 break
@@ -352,7 +355,7 @@ def global_restart():
 #         return matches
 
 #     def _get_queue(self, wait_pattern):
-#         for plugin in self.plugin_manager.plugins.values():
+#         for plugin in self.plugin_manager.user.values():
 #             for pattern, (func, queue) in plugin.respond_map.iteritems():
 #                 if pattern == wait_pattern:
 #                     return queue

@@ -154,7 +154,7 @@ XXX: is shelve thread-safe?
         return key in self.shelf
 
     def __getitem__(self, key):
-        atime, v = self.shelf[key]
+        atime, v = self.shelf.get(key)
         self[key] = v  # update atime
         return v
 
@@ -226,7 +226,7 @@ class SessionExpired(Exception):
 # store = DiskStore('{0}/run/sessions'.format(os.getenv('TOMBOT_HOME')))
 import shelve
 
-store = ShelfStore(shelve.open('{0}/run/session.db'.format(config.home)))
+store = ShelfStore(shelve.DbfilenameShelf('{0}/run/session.db'.format(config.home), protocol=2))
 
 
 class Session(object):
@@ -261,7 +261,7 @@ class Session(object):
         self.__setitem__ = self._data.__setitem__
         self.__delitem__ = self._data.__delitem__
 
-        self._load()
+        # self._load()
         self._save()
 
 

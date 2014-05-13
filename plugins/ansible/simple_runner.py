@@ -37,11 +37,11 @@
 import logging
 import os
 import re
-
 import ansible.inventory
 
-from helper.raw import raw_runner
+from plugins.ansible.helper.raw import raw_runner
 from engine import Respond, plugin
+
 
 respond = Respond()
 logger = logging.getLogger(__name__)

@@ -15,7 +15,8 @@ from tombot.brain.engine import Message
 from tombot.common import config
 from tombot.brain import holder
 from tombot.common import log
-from tombot.common.utils import tail, format_timedelta, get_sender_username
+from tombot.common.utils import tail, format_timedelta
+from tombot.brain.session import Session
 from tombot.brain.plugin import (
     get_all_active_plugin_names, deactivate_all_plugins, get_all_active_plugin_objects,
     get_all_plugins, global_restart, get_all_plugin_names, deactivate_plugin_by_name, activate_plugin_by_name,
@@ -81,18 +82,24 @@ class TomBot(Backend, StoreMixin):
         logger.debug('Receive message from client: {}'.format(message[0]))
         logger.debug('Full message body: {}'.format(message))
         msg_obj = Message(message, holder.broker_socket)
+        session_id = Session.generate_session_id(msg_obj.id, msg_obj.user)
+        self.sessions[session_id] = self.sessions.get(session_id) or Session(msg_obj.id, msg_obj.user)
+        current_session = self.sessions[session_id]
+        logger.debug('Global Sessions: {}'.format(self.sessions))
+        logger.debug('Current session: {}'.format(current_session._data))
+        msg_obj.session = current_session
         if super(TomBot, self).callback_message(msg_obj):
             # Act only in the backend tells us that this message is OK to broadcast
             for plugin in get_all_active_plugin_objects():
                 #noinspection PyBroadException
                 try:
                     logger.debug('Callback %s' % plugin)
-                    plugin.callback_message(message)
+                    plugin.callback_message(msg_obj)
                 except Exception as _:
                     logger.exception("Crash in a callback_message handler")
 
     def activate_non_started_plugins(self):
-        logger.info('Activating all the plugins...')
+        logger.info('Activating all the user...')
         errors = ''
         for pluginInfo in get_all_plugins():
             try:
@@ -174,14 +181,14 @@ class TomBot(Backend, StoreMixin):
         logger.info('Activate internal commands')
         loading_errors = self.activate_non_started_plugins()
         logger.info(loading_errors)
-        logger.info('Notifying connection to all the plugins...')
+        logger.info('Notifying connection to all the user...')
         self.signal_connect_to_all_plugins()
         logger.info('Plugin activation done.')
         self.inject_commands_from(self)
 
     def disconnect_callback(self):
         self.remove_commands_from(self)
-        logger.info('Disconnect callback, deactivating all the plugins.')
+        logger.info('Disconnect callback, deactivating all the user.')
         deactivate_all_plugins()
 
     def shutdown(self):
@@ -194,11 +201,11 @@ class TomBot(Backend, StoreMixin):
     @staticmethod
     def formatted_plugin_list(active_only=True):
         """
-        Return a formatted, plain-text list of loaded plugins.
+        Return a formatted, plain-text list of loaded user.
 
-        When active_only=True, this will only return plugins which
+        When active_only=True, this will only return user which
         are actually active. Otherwise, it will also include inactive
-        (blacklisted) plugins.
+        (blacklisted) user.
         """
         if active_only:
             all_plugins = get_all_active_plugin_names()
@@ -257,7 +264,7 @@ class TomBot(Backend, StoreMixin):
     @botcmd(admin_only=True)
     def restart(self, mess, args):
         """ restart the bot """
-        mess.send(mess.from_id, "Deactivating all the plugins...")
+        mess.send(mess.from_id, "Deactivating all the user...")
         deactivate_all_plugins()
         mess.send(mess.from_id, "Restarting")
         self.shutdown()
@@ -269,7 +276,7 @@ class TomBot(Backend, StoreMixin):
     def blacklist(self, mess, args):
         """Blacklist a plugin so that it will not be loaded automatically during bot startup"""
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugins are:\n"
+            return ("{} isn't a valid plugin name. The current user are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         return self.blacklist_plugin(args)
 
@@ -278,7 +285,7 @@ class TomBot(Backend, StoreMixin):
     def unblacklist(self, mess, args):
         """Remove a plugin from the blacklist"""
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugins are:\n"
+            return ("{} isn't a valid plugin name. The current user are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         return self.unblacklist_plugin(args)
 
@@ -288,10 +295,10 @@ class TomBot(Backend, StoreMixin):
         """load a plugin"""
         args = args.strip()
         if not args:
-            return ("Please tell me which of the following plugins to reload:\n"
+            return ("Please tell me which of the following user to reload:\n"
                     "{}".format(self.formatted_plugin_list(active_only=False)))
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugins are:\n"
+            return ("{} isn't a valid plugin name. The current user are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         if args in get_all_active_plugin_names():
             return "{} is already loaded".format(args)
@@ -315,10 +322,10 @@ class TomBot(Backend, StoreMixin):
         """unload a plugin"""
         args = args.strip()
         if not args:
-            return ("Please tell me which of the following plugins to reload:\n"
+            return ("Please tell me which of the following user to reload:\n"
                     "{}".format(self.formatted_plugin_list(active_only=False)))
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugins are:\n"
+            return ("{} isn't a valid plugin name. The current user are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         if args not in get_all_active_plugin_names():
             return "{} is not currently loaded".format(args)
@@ -331,11 +338,11 @@ class TomBot(Backend, StoreMixin):
         """reload a plugin"""
         args = args.strip()
         if not args:
-            yield ("Please tell me which of the following plugins to reload:\n"
+            yield ("Please tell me which of the following user to reload:\n"
                    "{}".format(self.formatted_plugin_list(active_only=False)))
             return
         if args not in get_all_plugin_names():
-            yield ("{} isn't a valid plugin name. The current plugins are:\n"
+            yield ("{} isn't a valid plugin name. The current user are:\n"
                    "{}".format(args, self.formatted_plugin_list(active_only=False)))
             return
 
@@ -415,7 +422,7 @@ class TomBot(Backend, StoreMixin):
     def history(self, mess, args):
         """display the command history"""
         answer = []
-        user_cmd_history = self.cmd_history[get_sender_username(mess)]
+        user_cmd_history = self.cmd_history[self.get_sender_username(mess)]
         l = len(user_cmd_history)
         for i in range(0, l):
             c = user_cmd_history[i]
@@ -479,4 +486,4 @@ class TomBot(Backend, StoreMixin):
         if not config.debug:
             with open(config.home + os.sep + 'log' + os.sep + 'tom.log', 'r') as f:
                 return tail(f, n)
-        return 'No log is configured, please define BOT_LOG_FILE in config.py'
+        return 'No log is configured, please define log_file in config.yaml'

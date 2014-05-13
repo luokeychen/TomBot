@@ -113,10 +113,11 @@ class Message(object):
 
         self.content = msg_body['content']
         self.msg_type = msg_body['type']
-        self.from_id = msg_body['user']
-        self.to_id = msg_body['id']
-        # self.content, self.msg_type, self.user_id, from_id = message[1:]
+        self.user = msg_body['user']
+        self.id = msg_body['id']
+        # self.content, self.msg_type, self.user_id, user = message[1:]
         self.socket = socket
+        self.session = None
 
     def _split_chunk(self, string, length):
         if length >= 4096:
@@ -124,16 +125,6 @@ class Message(object):
 
         lines = textwrap.wrap(string, width=length)
         return lines
-
-
-    def get_type(self):
-        return self.msg_type
-
-    def get_from(self):
-        return self.from_user
-
-    def get_body(self):
-        return self.content
 
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
         if not content:
@@ -146,12 +137,12 @@ class Message(object):
                 pass
         elif len(content) > 4096:
             warn_msg = make_msg(1, '消息过长，只显示部分内容',
-                                self.from_id, self.msg_type, self.to_id, const.WARNING_STYLE)
+                                self.user, self.msg_type, self.id, const.WARNING_STYLE)
 
             self.socket.send_multipart([self.identity,
                                         json.dumps(warn_msg)])
             content = content[:4096]
-        msg = make_msg(retcode, content, self.from_id, self.msg_type, self.to_id, style)
+        msg = make_msg(retcode, content, self.user, self.msg_type, self.id, style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])
@@ -263,8 +254,8 @@ class Message(object):
 
 class EngineBase(StoreMixin):
     """
-     This class handle the basic needs of bot plugins like loading, unloading and creating a storage
-     It is the main contract between the plugins and the bot
+     This class handle the basic needs of bot user like loading, unloading and creating a storage
+     It is the main contract between the user and the bot
     """
 
     def __init__(self):
@@ -312,7 +303,7 @@ class EngineBase(StoreMixin):
             args = []
 
         logging.debug('Programming the polling of %s every %i seconds with args %s and kwargs %s' % (
-        method.__name__, interval, str(args), str(kwargs)))
+            method.__name__, interval, str(args), str(kwargs)))
         #noinspection PyBroadException
         try:
             self.current_pollers.append((method, args, kwargs))
@@ -431,7 +422,7 @@ class Engine(EngineBase):
         pass
 
     # Proxyfy some useful tools from the motherbot
-    # this is basically the contract between the plugins and the main bot
+    # this is basically the contract between the user and the main bot
 
     def warn_admins(self, warning):
         """

@@ -57,7 +57,7 @@ name = yaml_dict.get('name')
 home = yaml_dict.get('home')
 
 log_level = yaml_dict['backend'].get('log_level')
-plugins = yaml_dict.get('plugins')
+plugins = yaml_dict.get('user')
 debug = yaml_dict['backend'].get('debug')
 runners = yaml_dict.get('runners')
 
@@ -79,8 +79,8 @@ max_message_size = yaml_dict['backend'].get('max_message_size')
 plugin_dirs = yaml_dict['plugin'].get('plugin_dirs')
 backlist = yaml_dict['plugin'].get('backlist')
 # TODO make possible to assign multiple plugin dir
-# plugin_dirs.append('plugins')
-# plugin_dirs = ['/home/konglx/project/TomBot/tombot/plugins']
+# plugin_dirs.append('user')
+# plugin_dirs = ['/home/konglx/project/TomBot/tombot/user']
 
 admins = yaml_dict['backend'].get('admins') or 'konglx'
 bot_alt_prefixes = yaml_dict['backend'].get('bot_alt_prefixes')

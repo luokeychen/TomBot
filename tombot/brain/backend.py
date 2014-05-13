@@ -126,7 +126,7 @@ class Backend(object):
 
         self.room_manager = RoomManager()
 
-        logger.info('Starting to load plugins...')
+        logger.info('Starting to load user...')
 
         if config.backend_count:
             from ..common.threadpool import ThreadPool
@@ -137,6 +137,7 @@ class Backend(object):
         self.commands = {}
         self.re_commands = {}
         self.bot_name = tuple(name.lower() for name in config.name)
+        self.sessions = {}
 
     def get_commands(self):
         return self.commands
@@ -172,7 +173,7 @@ class Backend(object):
         :param mess: Message object
         """
         # TODO Make it possible to convert from uin to QQ number.
-        return mess.from_id
+        return mess.user
 
     def callback_message(self, mess):
         """
@@ -181,7 +182,7 @@ class Backend(object):
         # Prepare to handle either private chats or group chats
 
         type = mess.msg_type
-        from_id = mess.from_id
+        user = mess.user
         content = mess.content
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
@@ -191,7 +192,7 @@ class Backend(object):
             logger.warn("unhandled message type %s" % mess)
             return False
 
-        logger.debug("*** from_id = %s" % from_id)
+        logger.debug("*** user = %s" % user)
         logger.debug("*** username = %s" % username)
         logger.debug("*** type = %s" % type)
         logger.debug("*** content = %s" % content)
@@ -305,7 +306,7 @@ class Backend(object):
         """Process and execute a bot command"""
         logger.info("Processing command {} with parameters '{}'".format(cmd, args))
 
-        from_id = mess.from_id
+        user = mess.user
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
 
@@ -333,12 +334,12 @@ class Backend(object):
         if not match and f._tom_command_split_args_with != '':
             args = args.split(f._tom_command_split_args_with)
         wr = WorkRequest(self._execute_and_send,
-            [], {'cmd': cmd, 'args': args, 'match': match, 'mess': mess, 'from_id': from_id})
+            [], {'cmd': cmd, 'args': args, 'match': match, 'mess': mess, 'user': user})
         self.thread_pool.put_request(wr)
         if f._tom_command_admin_only:
             self.thread_pool.wait()  # Again wait for the completion before accepting a new command that could generate weird concurrency issues
 
-    def _execute_and_send(self, cmd, args, match, mess, from_id):
+    def _execute_and_send(self, cmd, args, match, mess, user):
         """Execute a bot command and send output back to the caller
 
         cmd: The command that was given to the bot (after being expanded)
@@ -378,7 +379,7 @@ class Backend(object):
             tb = traceback.format_exc()
             logger.exception('An error happened while processing '
                              'a message ("%s") from %s: %s"' %
-                             (mess.content, mess.from_id, tb))
+                             (mess.content, mess.user, tb))
             send_reply(self.MSG_ERROR_OCCURRED + ':\n %s' % e)
 
     def serve_forever(self):
@@ -423,7 +424,7 @@ class Backend(object):
                     f = commands[name]
                     new_name = (classname + '-' + name).lower()
                     self.warn_admins('%s.%s clashes with %s.%s so it has been renamed %s' % (
-                    classname, name, type(f.__self__).__name__, f.__name__, new_name))
+                        classname, name, type(f.__self__).__name__, f.__name__, new_name))
                     name = new_name
                 commands[name] = value
 
