@@ -41,8 +41,8 @@ import yaml
 home = os.getenv('TOMBOT_HOME')
 
 if not home:
-    print('未配置TOMBOT_HOME环境变量，程序退出。')
-    exit(1003)
+    print('TOMBOT_HOME not configured, use $HOME/project/TomBot instead')
+    home = os.getenv('HOME') + os.sep + 'project' + os.sep + 'TomBot'
 
 # _path = os.path.abspath(os.path.dirname(__file__))
 config_file = file('{0}/conf/config.yaml'.format(home))
@@ -52,6 +52,7 @@ try:
 except Exception as e:
     print('配置文件载入错误:{0}'.format(e))
     exit(1006)
+version = yaml_dict.get('version')
 name = yaml_dict.get('name')
 home = yaml_dict.get('home')
 
@@ -69,11 +70,18 @@ proxy_host = yaml_dict.get('proxy_host')
 proxy_port = yaml_dict.get('proxy_port')
 
 default_mode = yaml_dict['backend'].get('default_mode')
-
+hide_restrict_command = yaml_dict['backend'].get('hide_restrict_command')
 backend_count = yaml_dict['backend'].get('workers')
 capture = yaml_dict['broker'].get('capture')
 
 max_message_size = yaml_dict['backend'].get('max_message_size')
 
-plugin_dirs = yaml_dict['plugin_dirs']
-plugin_dirs.append('plugins')
+plugin_dirs = yaml_dict['plugin'].get('plugin_dirs')
+backlist = yaml_dict['plugin'].get('backlist')
+# TODO make possible to assign multiple plugin dir
+# plugin_dirs.append('plugins')
+# plugin_dirs = ['/home/konglx/project/TomBot/tombot/plugins']
+
+admins = yaml_dict['backend'].get('admins') or 'konglx'
+bot_alt_prefixes = yaml_dict['backend'].get('bot_alt_prefixes')
+bot_alt_separators = yaml_dict['backend'].get('bot_alt_separators')

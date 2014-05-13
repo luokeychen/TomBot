@@ -33,21 +33,22 @@
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-29
 #  Description : manage plugins
+# TODO make ansible and builtin and user plugins separately
 
 import sys
 import os
-import logging
 from itertools import chain
+
 from yapsy.PluginManager import PluginManager
 
-import config
 from tombot.brain import holder
-from tombot.common import log
+from tombot.common import log, config
+from tombot.brain.engine import Engine, AnsibleEngine, BuiltinEngine
 
 
 logger = log.logger
 
-BUILTIN = str(os.path.dirname(os.path.abspath(__file__))) + os.sep + 'builtin'
+BUILTIN = config.home + os.sep + 'builtins'
 
 
 def get_builtins(extra):
@@ -62,12 +63,37 @@ def get_builtins(extra):
 
 def init_plugin_manager():
     global tom_plugin_manager
+    from engine import BuiltinEngine, AnsibleEngine, Engine
 
     if not holder.plugin_manager:
         tom_plugin_manager = PluginManager()
+        tom_plugin_manager.setPluginPlaces(config.plugin_dirs)
+        tom_plugin_manager.setPluginInfoExtension('plug')
+        # 3 types of plugins, Built-in for plugin come with Tom,
+        # Ansible for ansible simplerunner or playbook running on tom
+        # User for user-defined plugins
+        tom_plugin_manager.setCategoriesFilter({
+            'Built-in': BuiltinEngine,
+            'Ansible': AnsibleEngine,
+            'User': Engine
+        })
+        tom_plugin_manager.collectPlugins()
         holder.plugin_manager = tom_plugin_manager
     else:
         tom_plugin_manager = holder.plugin_manager
+
+
+class TomPluginManager(PluginManager):
+    def __init__(self):
+        super(TomPluginManager, self).__init__()
+        self.setPluginPlaces(config.plugin_dirs)
+        self.setPluginInfoExtension('plug')
+        self.setCategoriesFilter({
+            'Built-in': BuiltinEngine,
+            'Ansible': AnsibleEngine,
+            'User': Engine
+        })
+        self.collectPlugins()
 
 
 init_plugin_manager()
@@ -90,27 +116,29 @@ def populate_doc(plugin):
     plugin_type.__errdoc__ = plugin_type.__doc__ if plugin_type.__doc__ else plugin.description
 
 
-def activate_plugin(name, config):
-    pta_item = tom_plugin_manager.getPluginByName(name, 'bots')
+def activate_plugin_by_name(name):
+    pta_item = tom_plugin_manager.getPluginByName(name, 'User')
+    # pta_item = tom_plugin_manager.getPluginByName(name, 'Built-in')
+    # pta_item = tom_plugin_manager.getPluginByName(name, 'Ansible')
     if pta_item is None:
-        logging.warning('Could not activate %s' % name)
+        logger.warning('Could not activate %s' % name)
         return None
     obj = pta_item.plugin_object
 
     populate_doc(pta_item)
     try:
-        return tom_plugin_manager.activatePluginByName(name, "bots")
+        return tom_plugin_manager.activatePluginByName(name, "User")
     except Exception as _:
         pta_item.activated = False  # Yapsy doesn't revert this in case of error
-        logging.error("Plugin %s failed at activation stage, deactivating it..." % name)
-        tom_plugin_manager.deactivatePluginByName(name, "bots")
+        logger.error("Plugin %s failed at activation stage, deactivating it..." % name)
+        tom_plugin_manager.deactivatePluginByName(name, "User")
         raise
 
 
 def deactivate_plugin_by_name(name):
-    pta_item = tom_plugin_manager.getPluginByName(name, 'bots')
+    pta_item = tom_plugin_manager.getPluginByName(name, 'User')
     try:
-        return tom_plugin_manager.deactivatePluginByName(name, "bots")
+        return tom_plugin_manager.deactivatePluginByName(name, "User")
     except Exception as _:
         raise
 
@@ -123,7 +151,7 @@ def reload_plugin_by_name(name):
         deactivate_plugin_by_name(name)
 
     plugin = get_plugin_by_name(name)
-    logging.critical(dir(plugin))
+    logger.critical(dir(plugin))
     module = __import__(plugin.path.split(os.sep)[-1])
     reload(module)
 
@@ -150,7 +178,7 @@ def update_plugin_places(list):
     try:
         tom_plugin_manager.loadPlugins(add_candidate)
     except Exception as _:
-        logging.exception("Error while loading plugins")
+        logger.exception("Error while loading plugins")
 
     # FIXME temporary keep it from errbot
     errors = None
@@ -159,7 +187,7 @@ def update_plugin_places(list):
 
 
 def get_all_plugins():
-    logging.debug("All plugins: %s" % tom_plugin_manager.getAllPlugins())
+    logger.debug("All plugins: %s" % tom_plugin_manager.getAllPlugins())
     return tom_plugin_manager.getAllPlugins()
 
 

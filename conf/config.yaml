@@ -1,3 +1,4 @@
+version: 0.9
 # 机器人名字，将作为命令前缀
 name: Tom
 # 机器人home目录
@@ -5,7 +6,7 @@ home: /home/konglx/project/TomBot
 # 日志级别，有效的取值：debug info warn error critical
 
 # 用tcp连接或IPC，默认IPC，adapter和服务端没有部署在一起时有用，现在没用
-backend: 
+backend:
     log_level: debug
     use_tcp: True
     server_socket: tcp://*:4445
@@ -17,9 +18,14 @@ backend:
     debug: True
     workers: 1
     max_message_size: 4096
-    
+    hide_restrict_command: True
+    bot_alt_prefixes:
+      - tom
+    bot_alt_separators:
+      - ','
+      - ':'
 
-broker: 
+broker:
     capture: True
 
 proxy:
@@ -31,16 +37,12 @@ proxy:
 redis_server : 127.0.0.1
 redis_port : 9673
 
-# 启用的插件列表
-plugins:
-    - calc
+plugin:
+  plugin_dirs:
+    - /home/konglx/project/TomBot/tombot/plugins
+  backlist:
     - ping
-    - help
-#     - flow
-    - simsimi
-    - notify
-    - interactdemo
 
-runners:
+ansible:
   - simple_runner
 

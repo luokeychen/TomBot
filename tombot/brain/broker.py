@@ -38,7 +38,7 @@ import threading
 import zmq
 import zmq.auth
 
-import config
+from tombot.common import config
 
 
 def main():

@@ -83,17 +83,14 @@ try:
 except NameError:
     from sets import Set as set
 
-try:
-    from threading import local as threadlocal
-except ImportError:
-    from python23 import threadlocal
+from threading import local as threadlocal
 
 
 class Storage(dict):
     """
     A Storage object is like a dictionary except `obj.foo` can be used
     in addition to `obj['foo']`.
-    
+
         >>> o = storage(a=1)
         >>> o.a
         1
@@ -107,7 +104,7 @@ class Storage(dict):
         Traceback (most recent call last):
             ...
         AttributeError: 'a'
-    
+
     """
 
     def __getattr__(self, key):

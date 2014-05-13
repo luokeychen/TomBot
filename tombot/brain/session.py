@@ -42,13 +42,13 @@ import datetime
 import pickle
 import base64
 
-import config
-from tombot.common import log
+from tombot.common import log, config
+
 
 logger = log.logger
 
 # from webpy
-class Store:
+class Store(object):
     """Base class for session stores"""
 
     def __contains__(self, key):

@@ -38,7 +38,7 @@ import threading
 import logging
 
 import const
-import config
+from tombot.common import config
 
 logger = logging.getLogger('')
 
@@ -71,7 +71,6 @@ Exception: Houston we have problems!
 """
 import multiprocessing
 import time
-import logging
 #logger = multiprocessing.log_to_stdout()
 #logger.setLevel(logging.INFO)
 

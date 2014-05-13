@@ -62,7 +62,7 @@ class Shell(object):
         else:
             _ = ' '
             msg = dict(content=user_input,
-                       type=_,
+                       type='buddy',
                        id='1',
                        user='222'
             )
