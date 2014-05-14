@@ -20,7 +20,7 @@ from tombot.brain.session import Session
 from tombot.brain.plugin import (
     get_all_active_plugin_names, deactivate_all_plugins, get_all_active_plugin_objects,
     get_all_plugins, global_restart, get_all_plugin_names, deactivate_plugin_by_name, activate_plugin_by_name,
-    get_plugin_obj_by_name, reload_plugin_by_name, update_plugin_places
+    get_plugin_obj_by_name, reload_plugin_by_name, update_plugin_places, get_plugin_by_name
 )
 
 BL_PLUGINS = b'bl_plugins'
@@ -225,14 +225,13 @@ class TomBot(Backend, StoreMixin):
         for name in all_attempted:
             if name in all_blacklisted:
                 if name in all_loaded:
-                    plugins_statuses.append(('BL', name))
+                    plugins_statuses.append(('BL', get_plugin_by_name(name).category, name))
                 else:
                     plugins_statuses.append(('BU', name))
             elif name in all_loaded:
-                plugins_statuses.append(('L', name))
-            elif get_plugin_obj_by_name(name) is not None and get_plugin_obj_by_name(
-                    name).get_configuration_template() is not None:
-                plugins_statuses.append(('C', name))
+                plugins_statuses.append(('L', get_plugin_by_name(name).category, name))
+            elif get_plugin_obj_by_name(name) is not None:
+                plugins_statuses.append(('C', get_plugin_by_name(name).category, name))
             else:
                 plugins_statuses.append(('U', name))
 
@@ -243,7 +242,9 @@ class TomBot(Backend, StoreMixin):
             loads = getloadavg()
         except Exception as _:
             loads = None
-        return {'plugins_statuses': plugins_statuses, 'loads': loads, 'gc': gc.get_count()}
+
+        plugins_statuses = sorted(plugins_statuses, key=lambda c: c[2])
+        return {'plugins': plugins_statuses, 'loads': loads, 'gc': gc.get_count()}
 
     #noinspection PyUnusedLocal
     @botcmd

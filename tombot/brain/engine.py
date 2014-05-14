@@ -36,8 +36,6 @@
 
 
 import json
-import inspect
-from Queue import Queue, Empty
 import textwrap
 import logging
 import os
@@ -47,8 +45,6 @@ from threading import Timer, current_thread
 from helpers import make_msg
 import holder
 from tombot.common import log, config
-from session import Session
-from tombot.common.utils import PLUGINS_SUBDIR
 from storage import StoreMixin, StoreNotOpenError
 import const
 
@@ -273,7 +269,7 @@ class EngineBase(StoreMixin):
 
         classname = self.__class__.__name__
         logging.debug('Init storage for %s' % classname)
-        filename = data_dir + os.sep + PLUGINS_SUBDIR + os.sep + classname + '.db'
+        filename = data_dir + os.sep + 'plugins' + os.sep + classname + '.db'
         logging.debug('Loading %s' % filename)
         self.open_storage(filename)
         holder.bot.inject_commands_from(self)
@@ -302,7 +298,7 @@ class EngineBase(StoreMixin):
         if not args:
             args = []
 
-        logging.debug('Programming the polling of %s every %i seconds with args %s and kwargs %s' % (
+        logging.info('Programming the polling of %s every %i seconds with args %s and kwargs %s' % (
             method.__name__, interval, str(args), str(kwargs)))
         #noinspection PyBroadException
         try:
@@ -486,14 +482,75 @@ class Engine(EngineBase):
         super(Engine, self).stop_poller(method, args, kwargs)
 
 
-class BuiltinEngine(Engine):
+class BuiltinEngine(EngineBase):
     """Only used to make difference with user plugin and ansible plugin"""
 
     def __init__(self):
         super(BuiltinEngine, self).__init__()
 
+    def callback_connect(self):
+        """
+            Override to get a notified when the bot is connected
+        """
+        pass
 
-class AnsibleEngine(Engine):
+    def callback_message(self, mess):
+        """
+            Override to get a notified on *ANY* message.
+            If you are interested only by chatting message you can filter for example mess.getType() in ('groupchat', 'chat')
+        """
+        pass
+
+    def start_poller(self, interval, method, args=None, kwargs=None):
+        """
+            Start to poll a method at specific interval in seconds.
+            Note : it will call the method with the initial interval delay for the first time
+            Also, you can program
+            for example : self.program_poller(self,30, fetch_stuff)
+            where you have def fetch_stuff(self) in your plugin
+        """
+        super(BuiltinEngine, self).start_poller(interval, method, args, kwargs)
+
+    def stop_poller(self, method=None, args=None, kwargs=None):
+        """
+            stop poller(s).
+            if the method equals None -> it stops all the pollers
+            you need to regive the same parameters as the original start_poller to match a specific poller to stop
+        """
+        super(BuiltinEngine, self).stop_poller(method, args, kwargs)
+
+
+class AnsibleEngine(EngineBase):
     def __init__(self):
         super(AnsibleEngine, self).__init__()
 
+    def callback_connect(self):
+        """
+            Override to get a notified when the bot is connected
+        """
+        pass
+
+    def callback_message(self, mess):
+        """
+            Override to get a notified on *ANY* message.
+            If you are interested only by chatting message you can filter for example mess.getType() in ('groupchat', 'chat')
+        """
+        pass
+
+    def start_poller(self, interval, method, args=None, kwargs=None):
+        """
+            Start to poll a method at specific interval in seconds.
+            Note : it will call the method with the initial interval delay for the first time
+            Also, you can program
+            for example : self.program_poller(self,30, fetch_stuff)
+            where you have def fetch_stuff(self) in your plugin
+        """
+        super(AnsibleEngine, self).start_poller(interval, method, args, kwargs)
+
+    def stop_poller(self, method=None, args=None, kwargs=None):
+        """
+            stop poller(s).
+            if the method equals None -> it stops all the pollers
+            you need to regive the same parameters as the original start_poller to match a specific poller to stop
+        """
+        super(AnsibleEngine, self).stop_poller(method, args, kwargs)

@@ -1,0 +1,12 @@
+[Core]
+Name = SimpleRunner
+Module = simple_runner
+
+[Documentation]
+Description = Ansible runner for simple commands
+Author = Konglx
+Version = 1.0
+Website =
+
+[Python]
+Version = 2+

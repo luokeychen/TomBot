@@ -153,10 +153,10 @@ class Backend(object):
             part1 = 'Command "%s" / "%s" not found.' % (cmd, full_cmd)
         else:
             part1 = 'Command "%s" not found.' % cmd
-        ununderscore_keys = [m.replace('_', ' ') for m in self.commands.keys()]
-        matches = difflib.get_close_matches(cmd, ununderscore_keys)
+        underscore_keys = [m.replace('_', ' ') for m in self.commands.keys()]
+        matches = difflib.get_close_matches(cmd, underscore_keys)
         if full_cmd:
-            matches.extend(difflib.get_close_matches(full_cmd, ununderscore_keys))
+            matches.extend(difflib.get_close_matches(full_cmd, underscore_keys))
         matches = set(matches)
         if matches:
             return part1 + '\n\nDid you mean "' + config.name + ' ' + ('" or "' + config.name).join(matches) + '" ?'
@@ -497,95 +497,3 @@ class Backend(object):
         top = self.top_of_help_message()
         bottom = self.bottom_of_help_message()
         return ''.join(filter(None, [top, description, usage, bottom]))
-
-#
-#    def start(self):
-#
-#        self.rm = RoomManager()
-#
-#        logger.info('开始载入脚本...')
-#        self.pm = PluginManager(self.identity, pushsock=self.brokersock)
-#        self.pm.load_scripts('plugin')
-#        self.pm.load_scripts('ansible')
-#        self.pm.backend = self
-#        self.pm.start()
-#        logger.info('脚本载入完成')
-#        logger.info('backend准备开始监听')
-#
-#        def callback(msg):
-#            logger.debug('从adapter收到消息: {0}'.format(msg))
-#            # 处理消息信封，如果只有一层的话，那么第一帧是zmq.IDENTITY或UUID，第二帧为消息内容
-#            identity = msg[0]
-#            try:
-#                msg_body = json.loads(msg[1])
-#            except ValueError:
-#                logger.error('JSON格式错误！')
-#                return
-#            #这里无需处理retcode
-#            _id = msg_body.get('id')
-#            _content = msg_body.get('content').strip()
-#            _type = msg_body.get('type')
-#            _user = msg_body.get('user')
-#            self.make_simple_msg = partial(make_msg, retcode=0, id_=_id, type_=_type, user=_user)
-#
-#            room = self.create_room(_id, _type)
-#            # 赋一个空的message对象，用来发送消息
-#            room.message = Message((identity, None, _id, _type, _user), self.brokersock)
-#
-##             user = room.users.setdefault(_user, User(_user))
-#            # NOTE 当需要写session时，必须创建对象
-#            session = Session(_id, _user)
-#            session['history'].append(_content)
-#            session.save()
-#            logger.debug('backend session:{0}'.format(session._data))
-#            if session['iswait']:
-#                msg = self.make_simple_msg(content=_content)
-#                logger.debug('发送用户输入消息给scripts: {0!r}'.format(msg))
-#                backend.send_multipart([identity, json.dumps(msg)])
-#                return
-#
-#            change_msg = _change_mode(_content, room)
-#
-#            if change_msg:
-#                backend.send_multipart([identity, json.dumps(change_msg)])
-#                return
-#
-#            #命令模式自动补exec让脚本能够正常处理
-#            if room.mode == 'command':
-#                #非英文开头直接忽略
-#                if re.compile('^[a-z]').match(_content):
-#                    _content = 'exec ' + _content
-#                else:
-#                    return
-#
-#            elif room.mode == 'easy':
-#                if not re.compile('^[a-z\?]').match(_content):
-#                    return
-#
-#            elif room.mode == 'normal':
-#                pattern = re.compile('^{0}'.format(config.name),
-#                                     flags=re.IGNORECASE)
-#                if pattern.match(_content):
-#                    _content = pattern.sub('', _content, 1).strip()
-#                else:
-#                    return
-#
-#            else:
-#                logger.warn('无效的房间类型{0}'.format(room.mode))
-#            msg = self.make_simple_msg(content=_content)
-#            logger.debug('发布消息给scripts: {0!r}'.format(msg))
-#            backend.send_multipart([identity, json.dumps(msg)])
-#
-#        stream = zmqstream.ZMQStream(self.brokersock)
-#        stream.on_recv(callback)
-#
-#        loop = ioloop.IOLoop.instance()
-#
-#        try:
-#            loop.start()
-#        except KeyboardInterrupt:
-#            logger.info('收到退出信号，程序退出...')
-#            self.brokersock.close()
-#            backend.close()
-#            context.term()
-#            ioloop.IOLoop.instance().stop()

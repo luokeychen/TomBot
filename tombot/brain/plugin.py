@@ -33,7 +33,7 @@
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-29
 #  Description : manage user
-# TODO make ansible and builtin and user user separately
+# TODO make ansible and builtins and user user separately
 
 import sys
 import os
@@ -48,7 +48,7 @@ from tombot.brain.engine import Engine, AnsibleEngine, BuiltinEngine
 
 logger = log.logger
 
-BUILTIN = config.home + os.sep + 'builtins'
+BUILTIN = config.home + os.sep + 'plugins'
 
 
 def get_builtins(extra):
@@ -170,11 +170,12 @@ def reload_plugin_by_name(name):
 
 
 def update_plugin_places(list):
-    BOT_EXTRA_PLUGIN_DIR = config.plugin_dirs
-    builtins = get_builtins(BOT_EXTRA_PLUGIN_DIR)
+    builtins = get_builtins(config.plugin_dirs)
     for entry in chain(builtins, list):
         if entry not in sys.path:
             sys.path.append(entry)  # so the user can relatively import their submodules
+        for subdir in os.walk(entry).next()[1]:
+            sys.path.append(entry + os.sep + subdir)
 
     tom_plugin_manager.setPluginPlaces(chain(builtins, list))
     all_candidates = []

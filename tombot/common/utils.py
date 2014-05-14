@@ -66,7 +66,10 @@ __all__ = [
     "sendmail"
 ]
 
-import re, sys, time, threading, itertools, traceback, os
+import threading
+import itertools
+import re
+import time
 
 try:
     import subprocess
@@ -305,6 +308,7 @@ counter = Counter
 
 iters = [list, tuple]
 import __builtin__
+import sys
 
 if hasattr(__builtin__, 'set'):
     iters.append(set)

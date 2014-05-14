@@ -71,7 +71,7 @@ class NoWorkersAvailable(Exception):
     pass
 
 
-# internal module helper functions
+# internal module utils functions
 #noinspection PyUnusedLocal
 def _handle_thread_exception(request, exc_info):
     """Default exception handler callback function.

@@ -3,9 +3,7 @@
 from tombot.brain import holder
 from tombot.brain.bot import TomBot
 
-from helpers import init_logger
-
-logger = init_logger()
+from tombot.common.log import logger
 
 
 def run():
