@@ -100,8 +100,8 @@ class Backend(object):
     MSG_ERROR_OCCURRED = '消息处理发生异常'
     MESSAGE_SIZE_LIMIT = config.max_message_size
     MSG_UNKNOWN_COMMAND = 'Unknown command: "%(command)s". ' \
-                          'Type "' + config.name + 'help" for available commands.'
-    MSG_HELP_TAIL = 'Type help <command name> to get more info ' \
+                          'Type "' + config.main_name + 'help" for available commands.'
+    MSG_HELP_TAIL = 'Type help <command names> to get more info ' \
                     'about that specific command.'
     MSG_HELP_UNDEFINED_COMMAND = 'That command is not defined.'
 
@@ -130,7 +130,7 @@ class Backend(object):
 
         self.commands = {}
         self.re_commands = {}
-        self.bot_name = tuple(name.lower() for name in config.name)
+        self.bot_name = tuple(name.lower() for name in config.names)
         self.sessions = {}
 
     def get_commands(self):
@@ -153,7 +153,7 @@ class Backend(object):
             matches.extend(difflib.get_close_matches(full_cmd, underscore_keys))
         matches = set(matches)
         if matches:
-            return part1 + '\n\nDid you mean "' + config.name + ' ' + ('" or "' + config.name + ' ').join(
+            return part1 + '\n\nDid you mean "' + config.main_name + ' ' + ('" or "' + config.main_name + ' ').join(
                 matches) + '" ?'
         else:
             return part1
@@ -273,12 +273,12 @@ class Backend(object):
             for name, func in commands.items():
                 match = func._tom_command_re_pattern.search(content)
                 if match:
-                    logger.debug("Matching '{}' against '{}' produced a match"
+                    logger.debug(u"Matching '{}' against '{}' produced a match"
                                  .format(content, func._tom_command_re_pattern.pattern))
                     matched_on_re_command = True
                     self._process_command(mess, name, content, match)
                 else:
-                    logger.debug("Matching '{}' against '{}' produced no match"
+                    logger.debug(u"Matching '{}' against '{}' produced no match"
                                  .format(content, func._tom_command_re_pattern.pattern))
         if matched_on_re_command:
             return True
@@ -342,7 +342,7 @@ class Backend(object):
         match: A re.MatchObject if command is coming from a regex-based command, else None
         mess: The message object
         jid: The jid of the person executing the command
-        template_name: The name of the template which should be used to render
+        template_name: The names of the template which should be used to render
             html-im output, if any
 
         """
@@ -474,8 +474,8 @@ class Backend(object):
                 description = 'Available commands:'
 
             usage = '\n'.join(sorted([
-                config.name + '%s: %s' % (name, (command.__doc__ or
-                                                 '(undocumented)').strip().split('\n', 1)[0])
+                config.names + '%s: %s' % (name, (command.__doc__ or
+                                                  '(undocumented)').strip().split('\n', 1)[0])
                 for (name, command) in self.commands.iteritems() \
                 if name != 'help' \
                     and not command._tom_command_hidden

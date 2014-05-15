@@ -31,6 +31,7 @@ def __init_logger(log_obj, logname):
         log_obj.addHandler(fh)
         log_obj.addHandler(ch)
     else:
+        log_obj = logging.getLogger()
         tornado.log.enable_pretty_logging()
         log_obj.addHandler(fh)
 

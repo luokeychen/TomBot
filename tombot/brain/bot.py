@@ -46,7 +46,7 @@ class TomBot(Backend, StoreMixin):
         self.loop = ioloop.IOLoop().instance()
         data_dir = config.home + '/run/'
         self.open_storage(data_dir + 'bot.db')
-        self.prefix = config.name
+        self.prefix = 'Tom'
         self.all_candidates = None
         super(TomBot, self).__init__(*args, **kwargs)
 
@@ -77,6 +77,11 @@ class TomBot(Backend, StoreMixin):
                 bot.callback_message(mess)
             except Exception as _:
                 logger.exception("Crash in a callback_message handler")
+
+    def session_control(self, message):
+        current_session = message.session
+        if current_session['iswait']:
+            pass
 
     def callback_message(self, message):
         logger.debug('Receive message from client: {}'.format(message[0]))
@@ -281,7 +286,7 @@ class TomBot(Backend, StoreMixin):
     def blacklist(self, mess, args):
         """Blacklist a plugin so that it will not be loaded automatically during bot startup"""
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugins are:\n"
+            return ("{} isn't a valid plugin names. The current plugins are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         return self.blacklist_plugin(args)
 
@@ -290,7 +295,7 @@ class TomBot(Backend, StoreMixin):
     def unblacklist(self, mess, args):
         """Remove a plugin from the blacklist"""
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugins are:\n"
+            return ("{} isn't a valid plugin names. The current plugins are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         return self.unblacklist_plugin(args)
 
@@ -303,7 +308,7 @@ class TomBot(Backend, StoreMixin):
             return ("Please tell me which of the following plugin to reload:\n"
                     "{}".format(self.formatted_plugin_list(active_only=False)))
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugin are:\n"
+            return ("{} isn't a valid plugin names. The current plugin are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         if args in get_all_active_plugin_names():
             return "{} is already loaded".format(args)
@@ -330,7 +335,7 @@ class TomBot(Backend, StoreMixin):
             return ("Please tell me which of the following plugin to reload:\n"
                     "{}".format(self.formatted_plugin_list(active_only=False)))
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current plugin are:\n"
+            return ("{} isn't a valid plugin names. The current plugin are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         if args not in get_all_active_plugin_names():
             return "{} is not currently loaded".format(args)
@@ -347,7 +352,7 @@ class TomBot(Backend, StoreMixin):
                    "{}".format(self.formatted_plugin_list(active_only=False)))
             return
         if args not in get_all_plugin_names():
-            yield ("{} isn't a valid plugin name. The current plugin are:\n"
+            yield ("{} isn't a valid plugin names. The current plugin are:\n"
                    "{}".format(args, self.formatted_plugin_list(active_only=False)))
             return
 
@@ -387,7 +392,7 @@ class TomBot(Backend, StoreMixin):
             for (name, command) in self.commands.items():
                 clazz = get_class_that_defined_method(command)
                 commands = clazz_commands.get(clazz, [])
-                # if not config.hide_restrict_command or self.check_command_access(mess, name)[0]:
+                # if not config.hide_restrict_command or self.check_command_access(mess, names)[0]:
                 if not config.hide_restrict_command:
                     commands.append((name, command))
                     clazz_commands[clazz] = commands
@@ -399,7 +404,7 @@ class TomBot(Backend, StoreMixin):
                                                       (self.get_doc(command).strip()).split('\n', 1)[0])
                     for (name, command) in clazz_commands[clazz]
                     if name != 'help' and not command._tom_command_hidden
-                    # and (not config.hide_restrict_command or self.check_command_access(mess, name)[0])
+                    # and (not config.hide_restrict_command or self.check_command_access(mess, names)[0])
                     and (not config.hide_restrict_command)
                 ]))
             usage += '\n\n'
@@ -413,7 +418,7 @@ class TomBot(Backend, StoreMixin):
                                                   (self.get_doc(command).strip()).split('\n', 1)[0])
                 for (name, command) in commands
                 if not command._tom_command_hidden and (not config.hide_restrict_command)
-                # and (not config.hide_restrict_command or self.check_command_access(mess, name)[0])
+                # and (not config.hide_restrict_command or self.check_command_access(mess, names)[0])
             ]))
         else:
             return super(TomBot, self).help(mess, '_'.join(args.strip().split(' ')))
@@ -457,9 +462,9 @@ class TomBot(Backend, StoreMixin):
         clazz_commands = {}
         for (name, command) in self.commands.items():
             clazz = get_class_that_defined_method(command)
-            clazz = str.__module__ + '.' + clazz.__name__  # makes the fuul qualified name
+            clazz = str.__module__ + '.' + clazz.__name__  # makes the fuul qualified names
             commands = clazz_commands.get(clazz, [])
-            # if not config.hide_restrict_command or self.check_command_access(mess, name)[0]:
+            # if not config.hide_restrict_command or self.check_command_access(mess, names)[0]:
             if not config.hide_restrict_command:
                 commands.append((name, command))
                 clazz_commands[clazz] = commands

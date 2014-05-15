@@ -67,9 +67,10 @@ __all__ = [
 ]
 
 import threading
-import itertools
+import sys
 import re
 import time
+import itertools
 
 try:
     import subprocess
@@ -308,7 +309,6 @@ counter = Counter
 
 iters = [list, tuple]
 import __builtin__
-import sys
 
 if hasattr(__builtin__, 'set'):
     iters.append(set)
@@ -1506,7 +1506,7 @@ def sendmail(from_address, to_address, subject, message, headers=None, **kw):
         if isinstance(a, dict):
             mail.attach(a['filename'], a['content'], a.get('content_type'))
         elif hasattr(a, 'read'):  # file
-            filename = os.path.basename(getattr(a, "name", ""))
+            filename = os.path.basename(getattr(a, "names", ""))
             content_type = getattr(a, 'content_type', None)
             mail.attach(filename, a.read(), content_type)
         elif isinstance(a, basestring):

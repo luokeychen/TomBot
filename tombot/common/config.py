@@ -53,7 +53,8 @@ except Exception as e:
     print('配置文件载入错误:{0}'.format(e))
     exit(1006)
 version = yaml_dict.get('version')
-name = yaml_dict.get('name')
+names = yaml_dict.get('names')
+main_name = 'Tom'
 home = yaml_dict.get('home')
 
 log_level = yaml_dict['backend'].get('log_level')

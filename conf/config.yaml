@@ -1,6 +1,7 @@
 version: 0.9
 # 机器人名字，将作为命令前缀
-name: Tom
+names:
+  - Tom
 # 机器人home目录
 home: /home/konglx/project/TomBot
 # 日志级别，有效的取值：debug info warn error critical
@@ -19,9 +20,11 @@ backend:
     debug: True
     workers: 5
     max_message_size: 4096
+    # send full message when exceed max_message_size limit
+    send_full_msg_when_exceed: True
     hide_restrict_command: False
     bot_alt_prefixes:
-      - tom
+      - 'tom'
     bot_alt_separators:
       - ','
       - ':'

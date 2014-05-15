@@ -9,11 +9,11 @@
 import json
 
 from tornadohttpclient import TornadoHTTPClient
-from engine import Respond, plugin
 import threading
 import time
 
-respond = Respond()
+from tombot import re_botcmd
+from tombot import Engine
 
 
 class SimSimiTalk(object):
@@ -31,8 +31,7 @@ class SimSimiTalk(object):
         self.ready = False
 
         self.fetch_kwargs = {}
-        #self.fetch_kwargs.update(proxy_host='192.168.13.19',
-        #proxy_port='7777')
+        self.fetch_kwargs.update(proxy_host='192.168.13.19', proxy_port='7777')
 
         self._setup_cookie()
 
@@ -40,7 +39,7 @@ class SimSimiTalk(object):
         def callback(resp):
             self.ready = True
 
-        params = {"name": "PBot", "uid": "52125598"}
+        params = {"names": "PBot", "uid": "52125598"}
         headers = {"Referer": "http://www.simsimi.com/set_profile_frameview.htm",
                    "Accept": "application/json, text/javascript, */*; q=0.01",
                    "Accept-Language": "zh-cn,en_us;q=0.7,en;q=0.3",
@@ -78,14 +77,13 @@ class SimSimiTalk(object):
                     data = json.loads(resp.body)
                 except ValueError:
                     pass
-            callback(data.get("sentence_resp", "连接服务器失败"))
+            callback(data.get("sentence_resp", "Can not get respond from Simsimi server."))
 
         self.http.get(self.url, params, headers=headers,
                       callback=_talk)
 
 
-@plugin
-class SimSimi(object):
+class SimSimi(Engine):
     '''tom 中文, 智能回答（来自simsimi）'''
     simsimi = SimSimiTalk()
     message = None
@@ -93,13 +91,13 @@ class SimSimi(object):
     def callback(self, response):
         self.message.info(response.encode('utf-8'))
 
-    @respond.register(u'^[\u4e00-\u9fa5]+')
-    def handle_message(self, message, matches):
+    @re_botcmd(pattern=u'^[\u4e00-\u9fa5]+')
+    def handle_message(self, message, args):
         self.message = message
-        t = threading.Thread(target=self.talk, args=(message.content, self.callback))
-        t.setDaemon(True)
-        t.start()
-        return True
+        # t = threading.Thread(target=self.talk, args=(message.content, self.callback))
+        # t.setDaemon(True)
+        # t.start()
+        self.talk(message.content, self.callback)
 
     def talk(self, message, callback):
         while True:

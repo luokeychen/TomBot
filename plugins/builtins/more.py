@@ -42,7 +42,7 @@ class More(BuiltinEngine):
         message.send('Type "more" to see content.')
         user_input = message.get_input()
         if user_input == 'more':
-            message.send()
+            message.send_next()
             return True
         else:
             message.send('Type "more" to see content.')

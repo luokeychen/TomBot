@@ -33,6 +33,7 @@
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-08
 #  Description : user and room management
+from Queue import Queue
 
 from collections import deque
 from hashlib import sha1
@@ -254,6 +255,7 @@ class Session(object):
         self._data['uid'] = uid
         self._data['last'] = None
         self._data['history'] = deque(maxlen=10)
+        # self.queue = Queue(1)
 
         self.store = store
 

@@ -52,7 +52,7 @@ class SimpleRunner(AnsibleEngine):
 
     @botcmd
     def cmd(self, message, args):
-
+        """Command to run simple command on configured ansible hosts"""
         accept_commands = ['uptime', 'ls', 'df', 'du', 'vmstat', 'iostat', 'netstat', 'sar',
                            'free', 'cat', 'base64', 'grep', 'find', 'id', 'which', 'whereis',
                            'locate', 'ipcs', 'locale', 'lsof', 'lsattr', 'lspci', 'lscpu', 'lspv',

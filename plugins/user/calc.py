@@ -3,19 +3,16 @@ from __future__ import division
 
 import re
 
-from engine import Respond, plugin
-from tombot.common.utils import timeout, TimeoutException
+from tombot.common.utils import timelimit, TimeoutError
+from tombot import botcmd
+from tombot import Engine
 
-respond = Respond()
 
-
-@plugin
-class Caculator(object):
-    '''Tom calc 表达式 例如：tom calc 123^22/444+123.可以做位运算：tom calc 1<<3|&11|~123'''
-
-    @respond.register('calc (.*)$')
-    def respond(self, message, matches):
-        expression = matches.group(1).encode('utf-8')
+class Calculator(Engine):
+    @botcmd
+    def calc(self, message, args):
+        """Calculate expression, supports many types of operation"""
+        expression = args.encode('utf-8')
         try:
             result = self.calculate(expression)
             message.send(result)
@@ -25,12 +22,10 @@ class Caculator(object):
             message.error('这种格式汤姆不能理解！')
         except ZeroDivisionError:
             message.warn('不要调戏我！')
-        except TimeoutException:
+        except TimeoutError:
             message.error('太复杂了，要花太多时间，不干了。')
 
-        return True
-
-    @timeout(1)
+    @timelimit(2)
     def calculate(self, exp):
         exp = exp.replace(' ', '')
         exp = exp.replace('^', '**')

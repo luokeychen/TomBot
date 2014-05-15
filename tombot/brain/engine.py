@@ -126,7 +126,16 @@ class Message(object):
     def get_input(self):
         self.session['iswait'] = True
 
+    def send_next(self):
+        if not self.session['next']:
+            self.info('No more content to display.')
+        else:
+            self.send(self.session['next'])
+
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
+        # if not isinstance(self.content, str) or not isinstance(self.content, unicode):
+        #     logger.warn('Message content is not `str` or `unicode`, can not be send!')
+        #     return
         if not content:
             content = '执行结果为空'
             style = const.ERROR_STYLE
@@ -136,13 +145,14 @@ class Message(object):
             for line in lines:
                 pass
         elif len(content) > 4096:
-            warn_msg = make_msg(1, '消息过长，只显示部分内容',
-                                self.user, self.msg_type, self.id, const.WARNING_STYLE)
+            warn_msg = make_msg(1, '消息过长，只显示部分内容', self.user,
+                                self.msg_type, self.id, const.WARNING_STYLE)
 
             self.socket.send_multipart([self.identity,
                                         json.dumps(warn_msg)])
             content = content[:4096]
-        msg = make_msg(retcode=retcode, content=content, user=self.user, type_=self.msg_type, id_=self.id, style=style)
+        msg = make_msg(retcode=retcode, content=content, user=self.user,
+                       type_=self.msg_type, id_=self.id, style=style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])
@@ -376,7 +386,7 @@ class Engine(EngineBase):
 
     def get_installed_plugin_repos(self):
         """
-            Get the current installed plugin repos in a dictionary of name / url
+            Get the current installed plugin repos in a dictionary of names / url
         """
         return holder.bot.get_installed_plugin_repos()
 

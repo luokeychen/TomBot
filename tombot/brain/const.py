@@ -34,20 +34,20 @@
 #  Date        : 2014-03-09
 #  Description : consts
 
-DEFAULT_STYLE = {'name': 'Monospace', 'size': 10,
+DEFAULT_STYLE = {'names': 'Monospace', 'size': 10,
                  'style': [0, 0, 0], 'color': '000000'}
 
-OK_STYLE = {'name': '微软雅黑', 'size': 10,
+OK_STYLE = {'names': '微软雅黑', 'size': 10,
             'style': [0, 0, 0], 'color': '22B14C'}
 
-WARNING_STYLE = {'name': '微软雅黑', 'size': 10,
+WARNING_STYLE = {'names': '微软雅黑', 'size': 10,
                  'style': [0, 0, 0], 'color': 'FF7F27'}
 
-ERROR_STYLE = {'name': '微软雅黑', 'size': 10,
+ERROR_STYLE = {'names': '微软雅黑', 'size': 10,
                'style': [0, 0, 0], 'color': 'ED1C24'}
 
-INFO_STYLE = {'name': '微软雅黑', 'size': 10,
+INFO_STYLE = {'names': '微软雅黑', 'size': 10,
               'style': [0, 0, 0], 'color': '3F48CC'}
 
-CODE_STYLE = {'name': 'Consolas', 'size': 10,
+CODE_STYLE = {'names': 'Consolas', 'size': 10,
               'style': [0, 0, 0], 'color': '000000'}
