@@ -19,11 +19,11 @@ class Ping(Engine):
         '从我眼前走过的老鼠有很多只，但能停留在我心中的只有你这么一只！'
     ]
 
-    @botcmd
+    @re_botcmd(pattern=r'\?$')
     def respond(self, message, args):
+        """ Random response, to make sure Tom is working. """
         message.send(random.choice(self.greets))
-        message.send('Parameter: {}'.format(args))
 
-    @botcmd
-    def res(self, message, args):
-        message.send("I'm alive")
+    def callback_message(self, message):
+        if message.content.find('dbg') != -1 or message.content.find(u'大表哥') != -1:
+            message.info('我听到似乎有人提到了我们伟大的DBG？')

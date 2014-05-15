@@ -50,9 +50,6 @@ logger = logging.getLogger(__name__)
 class SimpleRunner(AnsibleEngine):
     """Tom exec command    执行命令"""
 
-    inventory_file = os.path.split(os.path.realpath(__file__))[0] + '/inventory/hosts.conf'
-    inventory = ansible.inventory.Inventory(inventory_file)
-
     @botcmd
     def cmd(self, message, args):
 

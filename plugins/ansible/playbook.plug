@@ -1,0 +1,12 @@
+[Core]
+Name = PlayBook
+Module = playbook
+
+[Documentation]
+Description = Ansible playbook runner
+Author = Konglx
+Version = 1.0
+Website =
+
+[Python]
+Version = 2+

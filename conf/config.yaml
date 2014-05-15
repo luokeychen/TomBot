@@ -19,7 +19,7 @@ backend:
     debug: True
     workers: 5
     max_message_size: 4096
-    hide_restrict_command: True
+    hide_restrict_command: False
     bot_alt_prefixes:
       - tom
     bot_alt_separators:

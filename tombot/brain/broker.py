@@ -33,12 +33,18 @@
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-14
 #  Description : 消息转发中间件
-
+import os
 import threading
+
 import zmq
 import zmq.auth
+from zmq.auth.thread import ThreadAuthenticator
 
 from tombot.common import config
+from tombot import log
+
+
+logger = log.broker_logger
 
 
 def main():
@@ -51,14 +57,20 @@ def main():
 
         frontend = context.socket(zmq.ROUTER)
         frontend.bind(config.server_socket)
+        frontend.curve_server = True
+
+        public_key, secret_key = zmq.auth.load_certificate(config.home + os.sep + 'certs' + os.sep + 'tom.key_secret')
+        # logger.debug('Pub Key: {0}, Secret Key: {1}'.format(certs[''], secret_key))
+        frontend.curve_secretkey = secret_key
+        frontend.curve_publickey = public_key
 
         if zmq.zmq_version_info() < (4, 0):
-            print('WARNING: ZMQ version must be higher than 4.0 for security communication')
-
+            logger.warn('WARNING: ZMQ version must be higher than 4.0 for security communication')
+        else:
             # configure CURVE security
-        #         auth_thread = ThreadAuthenticator(context=context, log=logger)
-        #         auth_thread.configure_curve(location=config.home + '/certs')
-        #         auth_thread.start()
+            auth_thread = ThreadAuthenticator(context=context, log=logger)
+            auth_thread.start()
+            auth_thread.configure_curve(location=config.home + '/certs')
 
         backend = context.socket(zmq.DEALER)
         backend.bind('ipc://{0}/broker.ipc'.format(config.ipc_path))
@@ -66,7 +78,7 @@ def main():
         t = threading.Thread(target=zmq.proxy, args=(frontend,
                                                      backend,
                                                      capture))
-        t.daemon = False
+        t.daemon = True
         t.start()
 
         debug_socket = context.socket(zmq.PULL)
@@ -74,15 +86,14 @@ def main():
 
         while True:
             msg = debug_socket.recv()
-            print(msg)
+            logger.info(msg)
 
-    except KeyboardInterrupt:
-        #         auth_thread.stop()
+    except KeyboardInterrupt:  #         auth_thread.stop()
         frontend.close()
         backend.close()
         capture.close()
         context.term()
-        exit(0)
+    exit(0)
 
 
 if __name__ == '__main__':

@@ -35,17 +35,15 @@
 #  Description :
 
 from tombot import BuiltinEngine
-from tombot import botcmd
 
 
 class More(BuiltinEngine):
-    @botcmd
-    def more(self, message, matches):
-        message.send('Type more to see rest content.')
-        user_input = respond.get_input()
+    def callback_message(self, message):
+        message.send('Type "more" to see content.')
+        user_input = message.get_input()
         if user_input == 'more':
-            message.send(matches.group(1))
+            message.send()
             return True
         else:
-            message.send('Type more to see rest content.')
+            message.send('Type "more" to see content.')
             return False

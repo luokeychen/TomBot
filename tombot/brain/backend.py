@@ -97,8 +97,7 @@ logger = log.logger
 class Backend(object):
     cmd_history = defaultdict(lambda: deque(maxlen=10))
 
-    MSG_ERROR_OCCURRED = 'Sorry for your inconvenience. ' \
-                         'An unexpected error occurred.'
+    MSG_ERROR_OCCURRED = '消息处理发生异常'
     MESSAGE_SIZE_LIMIT = config.max_message_size
     MSG_UNKNOWN_COMMAND = 'Unknown command: "%(command)s". ' \
                           'Type "' + config.name + 'help" for available commands.'
@@ -118,11 +117,6 @@ class Backend(object):
             self.broker_socket = holder.broker_socket
 
         self.bot_alt_prefixes = config.bot_alt_prefixes
-
-        # this connection used to communicate with plugin
-        # TODO plugin should connect backend NOT directly to broker
-        backend = context.socket(zmq.PUB)
-        backend.bind('ipc://{0}/backend.ipc'.format(config.ipc_path))
 
         self.room_manager = RoomManager()
 
@@ -159,7 +153,8 @@ class Backend(object):
             matches.extend(difflib.get_close_matches(full_cmd, underscore_keys))
         matches = set(matches)
         if matches:
-            return part1 + '\n\nDid you mean "' + config.name + ' ' + ('" or "' + config.name).join(matches) + '" ?'
+            return part1 + '\n\nDid you mean "' + config.name + ' ' + ('" or "' + config.name + ' ').join(
+                matches) + '" ?'
         else:
             return part1
 
@@ -181,20 +176,20 @@ class Backend(object):
         """
         # Prepare to handle either private chats or group chats
 
-        type = mess.msg_type
+        msg_type = mess.msg_type
         user = mess.user
         content = mess.content
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
 
-        # 3 types of QQ chat, there's sess type for non-friend talk, but with security issue, don't use it
-        if type not in ('buddy', 'group', 'discu'):
-            logger.warn("unhandled message type %s" % mess)
+        # 3 types of QQ chat, there's sess msg_type for non-friend talk, but with security issue, don't use it
+        if msg_type not in ('buddy', 'group', 'discu'):
+            logger.warn("unhandled message msg_type %s" % mess)
             return False
 
         logger.debug("*** user = %s" % user)
         logger.debug("*** username = %s" % username)
-        logger.debug("*** type = %s" % type)
+        logger.debug("*** msg_type = %s" % msg_type)
         logger.debug("*** content = %s" % content)
 
         # If a message format is not supported (eg. encrypted),
@@ -304,7 +299,7 @@ class Backend(object):
 
     def _process_command(self, mess, cmd, args, match):
         """Process and execute a bot command"""
-        logger.info("Processing command {} with parameters '{}'".format(cmd, args))
+        logger.info(u"Processing command {} with parameters '{}'".format(cmd, args))
 
         user = mess.user
         username = self.get_sender_username(mess)
@@ -437,11 +432,11 @@ class Backend(object):
 
     def remove_commands_from(self, instance_to_inject):
         for name, value in inspect.getmembers(instance_to_inject, inspect.ismethod):
-            if getattr(value, '_err_command', False):
-                name = getattr(value, '_err_command_name')
-                if getattr(value, '_err_re_command') and name in self.re_commands:
+            if getattr(value, '_tom_command', False):
+                name = getattr(value, '_tom_command_name')
+                if getattr(value, '_tom_re_command') and name in self.re_commands:
                     del (self.re_commands[name])
-                elif not getattr(value, '_err_re_command') and name in self.commands:
+                elif not getattr(value, '_tom_re_command') and name in self.commands:
                     del (self.commands[name])
 
     def warn_admins(self, warning):
@@ -483,7 +478,7 @@ class Backend(object):
                                                  '(undocumented)').strip().split('\n', 1)[0])
                 for (name, command) in self.commands.iteritems() \
                 if name != 'help' \
-                    and not command._err_command_hidden
+                    and not command._tom_command_hidden
             ]))
             usage = '\n\n' + '\n\n'.join(filter(None, [usage, self.MSG_HELP_TAIL]))
         else:

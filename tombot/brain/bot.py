@@ -16,7 +16,7 @@ from tombot.common import config
 from tombot.brain import holder
 from tombot.common import log
 from tombot.common.utils import tail, format_timedelta
-from tombot.brain.session import Session
+from tombot.brain.session import Session, store
 from tombot.brain.plugin import (
     get_all_active_plugin_names, deactivate_all_plugins, get_all_active_plugin_objects,
     get_all_plugins, global_restart, get_all_plugin_names, deactivate_plugin_by_name, activate_plugin_by_name,
@@ -88,6 +88,7 @@ class TomBot(Backend, StoreMixin):
         logger.debug('Global Sessions: {}'.format(self.sessions))
         logger.debug('Current session: {}'.format(current_session._data))
         msg_obj.session = current_session
+
         if super(TomBot, self).callback_message(msg_obj):
             # Act only in the backend tells us that this message is OK to broadcast
             for plugin in get_all_active_plugin_objects():
@@ -195,6 +196,7 @@ class TomBot(Backend, StoreMixin):
         logger.info('Shutting down...')
         deactivate_all_plugins()
         self.close_storage()
+        store.shelf.close()
         self.loop.stop()
         logger.info('Shutdown complete. Bye')
 
@@ -243,7 +245,7 @@ class TomBot(Backend, StoreMixin):
         except Exception as _:
             loads = None
 
-        plugins_statuses = sorted(plugins_statuses, key=lambda c: c[2])
+        # plugins_statuses = sorted(plugins_statuses, key=lambda c: c[2])
         return {'plugins': plugins_statuses, 'loads': loads, 'gc': gc.get_count()}
 
     #noinspection PyUnusedLocal
@@ -251,7 +253,9 @@ class TomBot(Backend, StoreMixin):
     def echo(self, mess, args):
         """ A simple echo command. Useful for encoding tests etc ...
         """
-        return args
+        if 'DBG' in args or 'dbg' in args:
+            return 'Do you mean the super-hero DBG?'
+        return args.encode('utf-8')
 
     #noinspection PyUnusedLocal
     @botcmd
@@ -265,9 +269,9 @@ class TomBot(Backend, StoreMixin):
     @botcmd(admin_only=True)
     def restart(self, mess, args):
         """ restart the bot """
-        mess.send(mess.from_id, "Deactivating all the user...")
+        mess.send("Deactivating all the plugins...")
         deactivate_all_plugins()
-        mess.send(mess.from_id, "Restarting")
+        mess.send("Restarting")
         self.shutdown()
         global_restart()
         return "I'm restarting..."
@@ -277,7 +281,7 @@ class TomBot(Backend, StoreMixin):
     def blacklist(self, mess, args):
         """Blacklist a plugin so that it will not be loaded automatically during bot startup"""
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current user are:\n"
+            return ("{} isn't a valid plugin name. The current plugins are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         return self.blacklist_plugin(args)
 
@@ -286,7 +290,7 @@ class TomBot(Backend, StoreMixin):
     def unblacklist(self, mess, args):
         """Remove a plugin from the blacklist"""
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current user are:\n"
+            return ("{} isn't a valid plugin name. The current plugins are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         return self.unblacklist_plugin(args)
 
@@ -296,10 +300,10 @@ class TomBot(Backend, StoreMixin):
         """load a plugin"""
         args = args.strip()
         if not args:
-            return ("Please tell me which of the following user to reload:\n"
+            return ("Please tell me which of the following plugin to reload:\n"
                     "{}".format(self.formatted_plugin_list(active_only=False)))
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current user are:\n"
+            return ("{} isn't a valid plugin name. The current plugin are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         if args in get_all_active_plugin_names():
             return "{} is already loaded".format(args)
@@ -323,10 +327,10 @@ class TomBot(Backend, StoreMixin):
         """unload a plugin"""
         args = args.strip()
         if not args:
-            return ("Please tell me which of the following user to reload:\n"
+            return ("Please tell me which of the following plugin to reload:\n"
                     "{}".format(self.formatted_plugin_list(active_only=False)))
         if args not in get_all_plugin_names():
-            return ("{} isn't a valid plugin name. The current user are:\n"
+            return ("{} isn't a valid plugin name. The current plugin are:\n"
                     "{}".format(args, self.formatted_plugin_list(active_only=False)))
         if args not in get_all_active_plugin_names():
             return "{} is not currently loaded".format(args)
@@ -339,11 +343,11 @@ class TomBot(Backend, StoreMixin):
         """reload a plugin"""
         args = args.strip()
         if not args:
-            yield ("Please tell me which of the following user to reload:\n"
+            yield ("Please tell me which of the following plugin to reload:\n"
                    "{}".format(self.formatted_plugin_list(active_only=False)))
             return
         if args not in get_all_plugin_names():
-            yield ("{} isn't a valid plugin name. The current user are:\n"
+            yield ("{} isn't a valid plugin name. The current plugin are:\n"
                    "{}".format(args, self.formatted_plugin_list(active_only=False)))
             return
 
@@ -371,10 +375,10 @@ class TomBot(Backend, StoreMixin):
         Automatically assigned to the "help" command."""
         usage = ''
         if not args:
-            description = 'Available help:\n'
+            description = 'Available help topics:\n'
             command_classes = sorted(set(self.get_command_classes()), key=lambda c: c.__name__)
             usage = '\n'.join(
-                self.prefix + '%s: %s' % (clazz.__name__, clazz.__tomdoc__ or '(undocumented)') for clazz in
+                '%s: %s' % (clazz.__name__, clazz.__tomdoc__ or '(undocumented)') for clazz in
                 command_classes)
         elif args == 'all':
             description = 'Available commands:'
@@ -403,7 +407,7 @@ class TomBot(Backend, StoreMixin):
             # filter out the commands related to this class
             commands = [(name, command) for (name, command) in self.commands.items() if
                         get_class_that_defined_method(command).__name__ == args]
-            description = 'Available commands for %s:\n\n' % args
+            description = 'Plugin %s contains commands:\n\n' % args
             usage += '\n'.join(sorted([
                 '\t' + self.prefix + ' %s: %s' % (name.replace('_', ' ', 1),
                                                   (self.get_doc(command).strip()).split('\n', 1)[0])
@@ -433,7 +437,7 @@ class TomBot(Backend, StoreMixin):
     #noinspection PyUnusedLocal
     @botcmd
     def about(self, mess, args):
-        """   Returns some information about this err instance"""
+        """   Returns some information about this Tom instance"""
 
         result = 'Tom version %s \n\n' % config.version
         result += 'Authors: Konglx <konglx@ffcs.cn>'
@@ -484,7 +488,7 @@ class TomBot(Backend, StoreMixin):
         n = 40
         if args.isdigit():
             n = int(args)
-        if not config.debug:
-            with open(config.home + os.sep + 'log' + os.sep + 'tom.log', 'r') as f:
-                return tail(f, n)
-        return 'No log is configured, please define log_file in config.yaml'
+            if n > 50:
+                return 'Only SB can do this...'
+        with open(config.home + os.sep + 'log' + os.sep + 'tom.log', 'r') as f:
+            return tail(f, n)

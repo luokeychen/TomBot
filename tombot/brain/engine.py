@@ -74,7 +74,8 @@ def botcmd(*args, **kwargs):
 
 
 def re_botcmd(*args, **kwargs):
-    def decorate(func, pattern, flags=0, prefixed=True, hidden=False, name=None, admin_only=False, historize=True,
+    def decorate(func, pattern, flags=re.IGNORECASE, prefixed=True, hidden=False, name=None, admin_only=False,
+                 historize=True,
                  template=None):
         if not hasattr(func, '_tom_command'):  # don't override generated functions
             setattr(func, '_tom_command', True)
@@ -122,6 +123,9 @@ class Message(object):
         lines = textwrap.wrap(string, width=length)
         return lines
 
+    def get_input(self):
+        self.session['iswait'] = True
+
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
         if not content:
             content = '执行结果为空'
@@ -138,7 +142,7 @@ class Message(object):
             self.socket.send_multipart([self.identity,
                                         json.dumps(warn_msg)])
             content = content[:4096]
-        msg = make_msg(retcode, content, self.user, self.msg_type, self.id, style)
+        msg = make_msg(retcode=retcode, content=content, user=self.user, type_=self.msg_type, id_=self.id, style=style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])
@@ -160,93 +164,6 @@ class Message(object):
     def code(self, content):
         self.send(content, style=const.CODE_STYLE)
 
-
-# class Respond(object):
-#     '''
-#     响应器，用于注册及获取响应函数
-#     '''
-#     def __init__(self):
-#         self.respond_map = {}
-#         self.plugin = self._get_caller_module()
-#         logger.error(self.plugin)
-#
-#     def register(self, pattern):
-#         '''消息响应装饰器
-#
-#         :param pattern: pattern应是一个合法的正则表达式
-#         '''
-#         # BUG 无法获取wrap前的函数名，functools也不行
-#         def wrapper(func, *args, **kwargs):
-#             queue = Queue(1)
-#             self.respond_map[pattern] = func, queue
-#             return func
-#         return wrapper
-#
-#     def get_respond(self, pattern):
-#         func = self.respond_map.get(pattern, None)
-#         if func is None:
-#             logger.warn('Response function not registed:{0}'.format(pattern))
-#         else:
-#             return func
-#
-#     # FIXME 这种方式可能导致不同Python实现的移植问题
-#     @staticmethod
-#     def _get_caller_module():
-#         stack = inspect.stack()
-#         parentframe = stack[2][0]
-#
-#         module = inspect.getmodule(parentframe)
-#
-#         return module
-#
-#     # FIXME 这种方式可能导致不同Python实现的移植问题
-#     @staticmethod
-#     def _get_caller(skip=2):
-#         stack = inspect.stack()
-#         start = 0 + skip
-#         if len(stack) < start + 1:
-#             return ''
-#         parentframe = stack[start][0]
-#         name = None
-#         codename = parentframe.f_code.co_name
-#
-#         if codename != '<module>': # top level usually
-#             name = codename
-#         del parentframe
-#         return name
-#
-#     def get_input(self, msg):
-# #         session_id = Session.generate_session_id(msg.id_, msg.user)
-#         session = Session(msg.id_, msg.user)
-#         # get caller
-#         caller = self._get_caller()
-#         # get caller instance
-#         instance = inspect.currentframe().f_back.f_locals['self']
-#         caller = getattr(instance, caller)
-#         # set session
-#         session['iswait'] = True
-#
-#         for pattern, (func, queue) in self.respond_map.items():
-#             if func == caller:
-#                 session['last'] = [pattern for (pattern, func) in self.respond_map.iteritems() if func == func][0]
-#                 session.save()
-#                 try:
-#                     logger.info('Server is waiting for user input...')
-#                     message = queue.get(timeout=5)
-#                     user_input = message.content
-#                     session['iswait'] = False
-#                     session.save()
-#                     return user_input
-#                 except Empty:
-#                     session['iswait'] = False
-#                     session.save()
-#                     msg.send('Input timeout, request canceled')
-#                     return None
-#
-#         session['iswait'] = False
-#         session.save()
-#         msg.send('由于未知原因，无法读取用户输入')
-#
 
 class EngineBase(StoreMixin):
     """
@@ -380,10 +297,10 @@ class Engine(EngineBase):
         """
         pass
 
-    def callback_message(self, mess):
+    def callback_message(self, message):
         """
             Override to get a notified on *ANY* message.
-            If you are interested only by chatting message you can filter for example mess.getType() in ('groupchat', 'chat')
+            If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
         """
         pass
 
@@ -494,10 +411,10 @@ class BuiltinEngine(EngineBase):
         """
         pass
 
-    def callback_message(self, mess):
+    def callback_message(self, message):
         """
             Override to get a notified on *ANY* message.
-            If you are interested only by chatting message you can filter for example mess.getType() in ('groupchat', 'chat')
+            If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
         """
         pass
 
@@ -530,10 +447,10 @@ class AnsibleEngine(EngineBase):
         """
         pass
 
-    def callback_message(self, mess):
+    def callback_message(self, message):
         """
             Override to get a notified on *ANY* message.
-            If you are interested only by chatting message you can filter for example mess.getType() in ('groupchat', 'chat')
+            If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
         """
         pass
 
