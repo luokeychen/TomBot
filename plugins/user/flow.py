@@ -1,21 +1,20 @@
 #coding: utf-8
 import os
+from tombot import botcmd
+from tombot import Engine
 
-from engine import Respond, plugin
 import cx_Oracle
 
 
 os.environ['NLS_LANG'] = 'american_america.ZHS16GBK'
-respond = Respond()
 
 
-@plugin
-class Flow(object):
+class Flow(Engine):
     '''Tom query flow id|标题\t  查询服务流程单号'''
 
-    @respond.register('flow (.+)$')
-    def respond(self, message, matches):
-        key = matches.group(1)
+    @botcmd
+    def flow(self, message, args):
+        key = args
         if self.check_contain_chinese(key):
             self.querydb(None, '%' + key + '%', message)
         else:

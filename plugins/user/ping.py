@@ -1,12 +1,11 @@
 #coding: utf-8
-from engine import Respond, plugin
 import random
 
-respond = Respond()
+from tombot import Engine
+from tombot import re_botcmd, botcmd
 
 
-@plugin
-class Ping(object):
+class Ping(Engine):
     '''Tom? 将得到随机应答，用来确认Tom是否在工作'''
     greets = [
         '在，主人！',
@@ -20,7 +19,11 @@ class Ping(object):
         '从我眼前走过的老鼠有很多只，但能停留在我心中的只有你这么一只！'
     ]
 
-    @respond.register('\?$')
-    def respond(self, message, matches):
+    @re_botcmd(pattern=r'\?$')
+    def respond(self, message, args):
+        """ Random response, to make sure Tom is working. """
         message.send(random.choice(self.greets))
-        return True
+
+    def callback_message(self, message):
+        if message.content.find('dbg') != -1 or message.content.find(u'大表哥') != -1:
+            message.info('我听到似乎有人提到了我们伟大的DBG？')

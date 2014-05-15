@@ -34,20 +34,16 @@
 #  Date        : 2014-04-27
 #  Description :
 
-from engine import Respond
-
-respond = Respond()
+from tombot import BuiltinEngine
 
 
-class More(object):
-    respond.register('more .*')
-
-    def more(self, message, matches):
-        message.send('Type more to see rest content.')
-        user_input = respond.get_input()
+class More(BuiltinEngine):
+    def callback_message(self, message):
+        message.send('Type "more" to see content.')
+        user_input = message.get_input()
         if user_input == 'more':
-            message.send(matches.group(1))
+            message.send_next()
             return True
         else:
-            message.send('Type more to see rest content.')
+            message.send('Type "more" to see content.')
             return False

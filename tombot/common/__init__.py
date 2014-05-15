@@ -1,1 +1,1 @@
-__all__ = ['dump', 'zpipe', 'set_id']
+__author__ = 'Konglx'

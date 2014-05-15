@@ -1,0 +1,12 @@
+[Core]
+Name = AnsibleBase
+Module = ansible_base
+
+[Documentation]
+Description = Ansible basic commands
+Author = Konglx
+Version = 1.0
+Website =
+
+[Python]
+Version = 2+

@@ -38,7 +38,7 @@ import threading
 import logging
 
 import const
-import config
+from tombot.common import config
 
 logger = logging.getLogger('')
 
@@ -71,7 +71,6 @@ Exception: Houston we have problems!
 """
 import multiprocessing
 import time
-import logging
 #logger = multiprocessing.log_to_stdout()
 #logger.setLevel(logging.INFO)
 
@@ -152,36 +151,4 @@ def make_msg(retcode=0, content=None, id_=None, type_=None, user=None,
                user=user)
     return msg
 
-
-def init_logger():
-    '''初始化logger
-    '''
-    import tornado.log
-
-    if not config.debug:
-        fmt = logging.Formatter('%(asctime)s %(module)s %(levelname)s %(message)s')
-
-        ch = logging.StreamHandler()
-        ch.setFormatter(fmt)
-        fh = logging.FileHandler('{0}/log/tom.log'.format(config.home))
-        fh.setFormatter(fmt)
-
-        logger.addHandler(fh)
-        logger.addHandler(ch)
-    else:
-        tornado.log.enable_pretty_logging()
-
-    if config.log_level == 'debug':
-        logger.setLevel(logging.DEBUG)
-    elif config.log_level == 'info':
-        logger.setLevel(logging.INFO)
-    elif config.log_level == 'warn':
-        logger.setLevel(logging.WARN)
-    elif config.log_level == 'error':
-        logger.setLevel(logging.ERROR)
-    elif config.log_level == 'critical':
-        logger.setLevel(logging.CRITICAL)
-    else:
-        logging.error('错误的日志级别，请设置成debug, info, warning, error, critical中的一个')
-    return logger
 

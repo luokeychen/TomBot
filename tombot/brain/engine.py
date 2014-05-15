@@ -36,8 +36,6 @@
 
 
 import json
-import inspect
-from Queue import Queue, Empty
 import textwrap
 import logging
 import os
@@ -45,18 +43,16 @@ import re
 from threading import Timer, current_thread
 
 from helpers import make_msg
-from tombot.brain import holder
-from tombot.common import log
-from session import Session
-from tombot.common.utils import PLUGINS_SUBDIR
-from brain import StoreMixin, StoreNotOpenError
+import holder
+from tombot.common import log, config
+from storage import StoreMixin, StoreNotOpenError
 import const
-import config
 
 
 logger = log.logger
 
 respond_handlers = {}
+
 
 def botcmd(*args, **kwargs):
     def decorate(func, hidden=False, name=None, split_args_with='', admin_only=False, historize=True, template=None):
@@ -78,7 +74,9 @@ def botcmd(*args, **kwargs):
 
 
 def re_botcmd(*args, **kwargs):
-    def decorate(func, pattern, flags=0, prefixed=True, hidden=False, name=None, admin_only=False, historize=True, template=None):
+    def decorate(func, pattern, flags=re.IGNORECASE, prefixed=True, hidden=False, name=None, admin_only=False,
+                 historize=True,
+                 template=None):
         if not hasattr(func, '_tom_command'):  # don't override generated functions
             setattr(func, '_tom_command', True)
             setattr(func, '_tom_re_command', True)
@@ -96,10 +94,6 @@ def re_botcmd(*args, **kwargs):
     else:
         return lambda func: decorate(func, **kwargs)
 
-def plugin(cls):
-    cls.__plugin__ = True
-    return cls
-
 
 class Message(object):
     '''包装消息，方便保存上下文
@@ -112,27 +106,36 @@ class Message(object):
     def __init__(self, message, socket):
         self.msg = message
         self.identity = message[0]
-        self.content, self.id_, self.type_, self.user = message[1:]
+        msg_body = json.loads(message[1])
+
+        self.content = msg_body['content']
+        self.msg_type = msg_body['type']
+        self.user = msg_body['user']
+        self.id = msg_body['id']
+        # self.content, self.msg_type, self.user_id, user = message[1:]
         self.socket = socket
+        self.session = None
 
     def _split_chunk(self, string, length):
         if length >= 4096:
-            logger.warn('分页长度过长，可能无法发送')
+            logger.warn("Page too long, may can't been proceed")
 
         lines = textwrap.wrap(string, width=length)
         return lines
 
+    def get_input(self):
+        self.session['iswait'] = True
 
-    def get_type(self):
-        return self.type_
-    
-    def get_from(self):
-        return self.id_
-
-    def get_body(self):
-        return self.content
+    def send_next(self):
+        if not self.session['next']:
+            self.info('No more content to display.')
+        else:
+            self.send(self.session['next'])
 
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
+        # if not isinstance(self.content, str) or not isinstance(self.content, unicode):
+        #     logger.warn('Message content is not `str` or `unicode`, can not be send!')
+        #     return
         if not content:
             content = '执行结果为空'
             style = const.ERROR_STYLE
@@ -142,18 +145,19 @@ class Message(object):
             for line in lines:
                 pass
         elif len(content) > 4096:
-            warn_msg = make_msg(1, '消息过长，只显示部分内容',
-                                self.id_, self.type_, self.user, const.WARNING_STYLE)
+            warn_msg = make_msg(1, '消息过长，只显示部分内容', self.user,
+                                self.msg_type, self.id, const.WARNING_STYLE)
 
             self.socket.send_multipart([self.identity,
                                         json.dumps(warn_msg)])
             content = content[:4096]
-        msg = make_msg(retcode, content, self.id_, self.type_, self.user, style)
+        msg = make_msg(retcode=retcode, content=content, user=self.user,
+                       type_=self.msg_type, id_=self.id, style=style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])
 
-        logger.info('推送消息到adapter: {0!r}'.format(msg))
+        logger.info('Push message to Client: {0!r}'.format(msg))
 
     def ok(self, content):
         self.send(content, style=const.OK_STYLE, retcode=0)
@@ -171,101 +175,14 @@ class Message(object):
         self.send(content, style=const.CODE_STYLE)
 
 
-class Respond(object):
-    '''
-    响应器，用于注册及获取响应函数
-    '''
-    def __init__(self):
-        self.respond_map = {}
-        self.plugin = self._get_caller_module()
-        logger.error(self.plugin)
-
-    def register(self, pattern):
-        '''消息响应装饰器
-
-        :param pattern: pattern应是一个合法的正则表达式
-        '''
-        # BUG 无法获取wrap前的函数名，functools也不行
-        def wrapper(func, *args, **kwargs):
-            queue = Queue(1)
-            self.respond_map[pattern] = func, queue
-            return func
-        return wrapper
-
-    def get_respond(self, pattern):
-        func = self.respond_map.get(pattern, None)
-        if func is None:
-            logger.warn('未注册响应器:{0}'.format(pattern))
-        else:
-            return func
-
-    # FIXME 这种方式可能导致不同Python实现的移植问题
-    @staticmethod
-    def _get_caller_module():
-        stack = inspect.stack()
-        parentframe = stack[2][0]
-
-        module = inspect.getmodule(parentframe)
-
-        return module
-
-    # FIXME 这种方式可能导致不同Python实现的移植问题
-    @staticmethod
-    def _get_caller(skip=2):
-        stack = inspect.stack()
-        start = 0 + skip
-        if len(stack) < start + 1:
-            return ''
-        parentframe = stack[start][0]
-        name = None
-        codename = parentframe.f_code.co_name
-
-        if codename != '<module>': # top level usually
-            name = codename
-        del parentframe
-        return name
-
-    def get_input(self, msg):
-#         session_id = Session.generate_session_id(msg.id_, msg.user)
-        session = Session(msg.id_, msg.user)
-        # get caller
-        caller = self._get_caller()
-        # get caller instance
-        instance = inspect.currentframe().f_back.f_locals['self']
-        caller = getattr(instance, caller)
-        # set session
-        session['iswait'] = True
-
-        for pattern, (func, queue) in self.respond_map.items():
-            if func == caller:
-                session['last'] = [pattern for (pattern, func) in self.respond_map.iteritems() if func == func][0]
-                session.save()
-                try:
-                    logger.info('服务器正在等待用户输入')
-                    message = queue.get(timeout=5)
-                    user_input = message.content
-                    session['iswait'] = False
-                    session.save()
-                    return user_input
-                except Empty:
-                    session['iswait'] = False
-                    session.save()
-                    msg.send(u'输入超时，任务取消')
-                    return None
-
-        session['iswait'] = False
-        session.save()
-        msg.send('由于未知原因，无法读取用户输入')
-
-
 class EngineBase(StoreMixin):
     """
-     This class handle the basic needs of bot plugins like loading, unloading and creating a storage
-     It is the main contract between the plugins and the bot
+     This class handle the basic needs of bot user like loading, unloading and creating a storage
+     It is the main contract between the user and the bot
     """
 
     def __init__(self):
-        self.plugin_dir = holder.bot.plugin_dir
+        #self.plugin_dir = holder.bot.plugin_dir
         self.is_activated = False
         self.current_pollers = []
         self.current_timers = []
@@ -275,11 +192,11 @@ class EngineBase(StoreMixin):
         """
             Override if you want to do something at initialization phase (don't forget to super(Gnagna, self).activate())
         """
-        data_dir = config.home + '/run/data'
+        data_dir = config.home + '/run/'
 
         classname = self.__class__.__name__
         logging.debug('Init storage for %s' % classname)
-        filename = data_dir + os.sep + PLUGINS_SUBDIR + os.sep + classname + '.db'
+        filename = data_dir + os.sep + 'plugins' + os.sep + classname + '.db'
         logging.debug('Loading %s' % filename)
         self.open_storage(filename)
         holder.bot.inject_commands_from(self)
@@ -308,7 +225,8 @@ class EngineBase(StoreMixin):
         if not args:
             args = []
 
-        logging.debug('Programming the polling of %s every %i seconds with args %s and kwargs %s' % (method.__name__, interval, str(args), str(kwargs)))
+        logging.info('Programming the polling of %s every %i seconds with args %s and kwargs %s' % (
+            method.__name__, interval, str(args), str(kwargs)))
         #noinspection PyBroadException
         try:
             self.current_pollers.append((method, args, kwargs))
@@ -325,7 +243,8 @@ class EngineBase(StoreMixin):
         self.current_pollers.remove((method, args, kwargs))
 
     def program_next_poll(self, interval, method, args, kwargs):
-        t = Timer(interval=interval, function=self.poller, kwargs={'interval': interval, 'method': method, 'args': args, 'kwargs': kwargs})
+        t = Timer(interval=interval, function=self.poller,
+                  kwargs={'interval': interval, 'method': method, 'args': args, 'kwargs': kwargs})
         self.current_timers.append(t)  # save the timer to be able to kill it
         t.setName('Poller thread for %s' % type(method.__self__).__name__)
         t.setDaemon(True)  # so it is not locking on exit
@@ -388,10 +307,10 @@ class Engine(EngineBase):
         """
         pass
 
-    def callback_message(self, conn, mess):
+    def callback_message(self, message):
         """
             Override to get a notified on *ANY* message.
-            If you are interested only by chatting message you can filter for example mess.getType() in ('groupchat', 'chat')
+            If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
         """
         pass
 
@@ -426,7 +345,7 @@ class Engine(EngineBase):
         pass
 
     # Proxyfy some useful tools from the motherbot
-    # this is basically the contract between the plugins and the main bot
+    # this is basically the contract between the user and the main bot
 
     def warn_admins(self, warning):
         """
@@ -467,7 +386,7 @@ class Engine(EngineBase):
 
     def get_installed_plugin_repos(self):
         """
-            Get the current installed plugin repos in a dictionary of name / url
+            Get the current installed plugin repos in a dictionary of names / url
         """
         return holder.bot.get_installed_plugin_repos()
 
@@ -489,3 +408,76 @@ class Engine(EngineBase):
         """
         super(Engine, self).stop_poller(method, args, kwargs)
 
+
+class BuiltinEngine(EngineBase):
+    """Only used to make difference with user plugin and ansible plugin"""
+
+    def __init__(self):
+        super(BuiltinEngine, self).__init__()
+
+    def callback_connect(self):
+        """
+            Override to get a notified when the bot is connected
+        """
+        pass
+
+    def callback_message(self, message):
+        """
+            Override to get a notified on *ANY* message.
+            If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
+        """
+        pass
+
+    def start_poller(self, interval, method, args=None, kwargs=None):
+        """
+            Start to poll a method at specific interval in seconds.
+            Note : it will call the method with the initial interval delay for the first time
+            Also, you can program
+            for example : self.program_poller(self,30, fetch_stuff)
+            where you have def fetch_stuff(self) in your plugin
+        """
+        super(BuiltinEngine, self).start_poller(interval, method, args, kwargs)
+
+    def stop_poller(self, method=None, args=None, kwargs=None):
+        """
+            stop poller(s).
+            if the method equals None -> it stops all the pollers
+            you need to regive the same parameters as the original start_poller to match a specific poller to stop
+        """
+        super(BuiltinEngine, self).stop_poller(method, args, kwargs)
+
+
+class AnsibleEngine(EngineBase):
+    def __init__(self):
+        super(AnsibleEngine, self).__init__()
+
+    def callback_connect(self):
+        """
+            Override to get a notified when the bot is connected
+        """
+        pass
+
+    def callback_message(self, message):
+        """
+            Override to get a notified on *ANY* message.
+            If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
+        """
+        pass
+
+    def start_poller(self, interval, method, args=None, kwargs=None):
+        """
+            Start to poll a method at specific interval in seconds.
+            Note : it will call the method with the initial interval delay for the first time
+            Also, you can program
+            for example : self.program_poller(self,30, fetch_stuff)
+            where you have def fetch_stuff(self) in your plugin
+        """
+        super(AnsibleEngine, self).start_poller(interval, method, args, kwargs)
+
+    def stop_poller(self, method=None, args=None, kwargs=None):
+        """
+            stop poller(s).
+            if the method equals None -> it stops all the pollers
+            you need to regive the same parameters as the original start_poller to match a specific poller to stop
+        """
+        super(AnsibleEngine, self).stop_poller(method, args, kwargs)

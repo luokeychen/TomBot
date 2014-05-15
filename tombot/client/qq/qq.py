@@ -11,6 +11,7 @@
         python qq.py [qq] [password]
 '''
 import logging
+import sys
 import zmq
 import json
 import smtplib
@@ -19,7 +20,6 @@ from zmq.eventloop import zmqstream, ioloop
 ioloop.install()
 import yaml
 
-import sys
 import os
 import traceback
 
@@ -38,9 +38,6 @@ logger.setLevel(logging.DEBUG)
 
 fp = file('config.yaml')
 config = yaml.load(fp)
-
-push_socket = config.get('push_socket')
-pull_socket = config.get('pull_socket')
 
 SMTP_HOST = config.get('smtp_host')
 SMTP_ACCOUNT = config.get('smtp_account')

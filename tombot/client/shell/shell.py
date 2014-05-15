@@ -38,7 +38,14 @@
 import os
 import sys
 import zmq
+import zmq.auth
+from zmq.auth.thread import ThreadAuthenticator
 import threading
+from tombot import log
+
+from tombot import config
+
+logger = log.logger
 
 _home = os.getenv('TOMBOT_HOME')
 _prompt = 'TomBot> '
@@ -46,6 +53,12 @@ _prompt = 'TomBot> '
 context = zmq.Context(1)
 dealer = context.socket(zmq.DEALER)
 dealer.setsockopt(zmq.IDENTITY, 'SHELL')
+# dealer.curve_server = True
+public_key, secret_key = zmq.auth.load_certificate(config.home + os.sep + 'certs' + os.sep + 'tom.key_secret')
+logger.debug('Pub Key: {0}, Secret Key: {1}'.format(public_key, secret_key))
+# dealer.curve_secretkey = secret_key
+# dealer.curve_publickey = public_key
+
 dealer.connect('tcp://127.0.0.1:4445')
 
 
@@ -62,7 +75,7 @@ class Shell(object):
         else:
             _ = ' '
             msg = dict(content=user_input,
-                       type=_,
+                       type='buddy',
                        id='1',
                        user='222'
             )
@@ -73,6 +86,7 @@ class Shell(object):
         t = threading.Thread(target=self.recv)
         t.daemon = True
         t.start()
+        import time
 
         while True:
             if self.lock:

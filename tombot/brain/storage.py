@@ -17,7 +17,7 @@ class StoreNotOpenError(StoreException):
 
 class StoreMixin(MutableMapping):
     """
-     This class handle the basic needs of bot plugins and core like loading, unloading and creating a storage
+     This class handle the basic needs of bot user and core like loading, unloading and creating a storage
     """
 
     def open_storage(self, path):

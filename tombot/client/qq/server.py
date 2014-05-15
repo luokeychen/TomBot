@@ -69,8 +69,8 @@ class CheckHandler(BaseHandler):
                 html = """
                 <img src="/check" />
                 <form action="/" method="POST">
-                    验证码:<input type="text" name="vertify" />
-                    <input type="submit" name="xx" value="提交" />
+                    验证码:<input type="text" names="vertify" />
+                    <input type="submit" names="xx" value="提交" />
                 </form>
                 """
         else:

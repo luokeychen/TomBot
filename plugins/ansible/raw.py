@@ -28,12 +28,13 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : helper.py
+#  File        : utils.py
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-29
 #  Description : ansible辅助
 import ansible.runner
+from common import inventory
 
 
 def raw_runner(command, pattern, inventory):

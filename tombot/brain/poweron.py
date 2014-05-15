@@ -1,20 +1,16 @@
 # coding: utf-8
-import os
 
-from backend import Backend
-import config
-from helpers import init_logger
+from tombot.brain import holder
+from tombot.brain.bot import TomBot
 
-import zmq
-
-logger = init_logger()
-_path = os.path.abspath(os.path.dirname(__file__))
-
-context = zmq.Context()
+from tombot.common.log import logger
 
 
 def run():
-    backend = Backend()
+    holder.bot = TomBot()
+    holder.bot.activate_non_started_plugins()
+    logger.info("Bot's commands: {}".format(holder.bot.get_commands()))
+    holder.bot.serve_forever()
 
 
 if __name__ == '__main__':

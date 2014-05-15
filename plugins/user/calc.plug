@@ -1,0 +1,9 @@
+[Core]
+Name = Caculator
+Module = calc
+
+[Documentation]
+Description = Perform caculate
+
+[Python]
+Version = 2+

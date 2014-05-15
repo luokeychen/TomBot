@@ -1,0 +1,9 @@
+[Core]
+Name = Simsimi
+Module = simsimi
+
+[Documentation]
+Description = A clever chat bot, powered by Simsimi.com
+
+[Python]
+Version = 2+

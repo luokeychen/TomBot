@@ -37,27 +37,22 @@
 import logging
 import os
 import re
-
 import ansible.inventory
 
-from helper.raw import raw_runner
-from engine import Respond, plugin
+from raw import raw_runner
+from tombot import AnsibleEngine
+from tombot import botcmd
 
-respond = Respond()
+
 logger = logging.getLogger(__name__)
 
 
-@plugin
-class SimpleRunner(object):
-    '''Tom exec command    执行命令'''
+class SimpleRunner(AnsibleEngine):
+    """Tom exec command    执行命令"""
 
-    def __init__(self):
-        inventory_file = os.path.split(os.path.realpath(__file__))[0] + '/inventory/hosts.conf'
-        self.inventory = ansible.inventory.Inventory(inventory_file)
-
-    @respond.register('exec (.*)')
-    def handler(self, message, matches):
-
+    @botcmd
+    def cmd(self, message, args):
+        """Command to run simple command on configured ansible hosts"""
         accept_commands = ['uptime', 'ls', 'df', 'du', 'vmstat', 'iostat', 'netstat', 'sar',
                            'free', 'cat', 'base64', 'grep', 'find', 'id', 'which', 'whereis',
                            'locate', 'ipcs', 'locale', 'lsof', 'lsattr', 'lspci', 'lscpu', 'lspv',
@@ -65,18 +60,18 @@ class SimpleRunner(object):
                            'ulimit', 'dmesg', 'head', 'tail', 'hostname', 'ifconfig', 'lsblk',
                            'uname', 'cd', 'pwd', 'java']
 
-        inputs = matches.group(1)
+        if not len(args):
+            return '参数错误'
         pattern = '*'
-        if inputs.find(' on ') > 0:
-            m = re.match('(.*?) on (.*)', inputs)
+        if args.find(' on ') > 0:
+            m = re.match(r'(.*?) on (.*)', args)
             input_command = m.group(1)
             pattern = m.group(2)
         else:
-            input_command = inputs
+            input_command = args
 
-        for command in accept_commands:
-            if re.match('(\w+)', input_command).group(1) == command:
-                result = raw_runner(input_command, pattern, self.inventory)
-                message.send(result)
-                return
-        message.error('禁止执行的命令!')
+        if args.split()[0] in accept_commands:
+            result = raw_runner(input_command, pattern, self.inventory)
+            return result
+        else:
+            return '禁止执行的命令!'

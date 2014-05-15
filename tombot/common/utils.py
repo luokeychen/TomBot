@@ -28,11 +28,11 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : 
+#  File        :
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-05-07
-#  Description : 
+#  Description :
 
 
 """
@@ -66,7 +66,11 @@ __all__ = [
     "sendmail"
 ]
 
-import re, sys, time, threading, itertools, traceback, os
+import threading
+import sys
+import re
+import time
+import itertools
 
 try:
     import subprocess
@@ -83,17 +87,14 @@ try:
 except NameError:
     from sets import Set as set
 
-try:
-    from threading import local as threadlocal
-except ImportError:
-    from python23 import threadlocal
+from threading import local as threadlocal
 
 
 class Storage(dict):
     """
     A Storage object is like a dictionary except `obj.foo` can be used
     in addition to `obj['foo']`.
-    
+
         >>> o = storage(a=1)
         >>> o.a
         1
@@ -107,7 +108,7 @@ class Storage(dict):
         Traceback (most recent call last):
             ...
         AttributeError: 'a'
-    
+
     """
 
     def __getattr__(self, key):
@@ -135,16 +136,16 @@ storage = Storage
 def storify(mapping, *requireds, **defaults):
     """
     Creates a `storage` object from dictionary `mapping`, raising `KeyError` if
-    d doesn't have all of the keys in `requireds` and using the default 
+    d doesn't have all of the keys in `requireds` and using the default
     values for keys found in `defaults`.
 
     For example, `storify({'a':1, 'c':3}, b=2, c=0)` will return the equivalent of
     `storage({'a':1, 'b':2, 'c':3})`.
-    
-    If a `storify` value is a list (e.g. multiple values in a form submission), 
-    `storify` returns the last element of the list, unless the key appears in 
+
+    If a `storify` value is a list (e.g. multiple values in a form submission),
+    `storify` returns the last element of the list, unless the key appears in
     `defaults` as a list. Thus:
-    
+
         >>> storify({'a':[1, 2]}).a
         2
         >>> storify({'a':[1, 2]}, a=[]).a
@@ -153,19 +154,19 @@ def storify(mapping, *requireds, **defaults):
         [1]
         >>> storify({}, a=[]).a
         []
-    
+
     Similarly, if the value has a `value` attribute, `storify will return _its_
     value, unless the key appears in `defaults` as a dictionary.
-    
+
         >>> storify({'a':storage(value=1)}).a
         1
         >>> storify({'a':storage(value=1)}, a={}).a
         <Storage {'value': 1}>
         >>> storify({}, a={}).a
         {}
-        
+
     Optionally, keyword parameter `_unicode` can be passed to convert all values to unicode.
-    
+
         >>> storify({'x': 'a'}, _unicode=True)
         <Storage {'x': u'a'}>
         >>> storify({'x': storage(value='a')}, x={}, _unicode=True)
@@ -221,7 +222,7 @@ def storify(mapping, *requireds, **defaults):
 
 class Counter(storage):
     """Keeps count of how many times something is added.
-        
+
         >>> c = counter()
         >>> c.add('x')
         >>> c.add('x')
@@ -266,7 +267,7 @@ class Counter(storage):
 
     def sorted_keys(self):
         """Returns keys sorted by value.
-             
+
              >>> c = counter()
              >>> c.add('x')
              >>> c.add('x')
@@ -278,7 +279,7 @@ class Counter(storage):
 
     def sorted_values(self):
         """Returns values sorted by value.
-            
+
             >>> c = counter()
             >>> c.add('x')
             >>> c.add('x')
@@ -290,7 +291,7 @@ class Counter(storage):
 
     def sorted_items(self):
         """Returns items sorted by value.
-            
+
             >>> c = counter()
             >>> c.add('x')
             >>> c.add('x')
@@ -355,7 +356,7 @@ def rstrips(text, remove):
 
         >>> rstrips("foobar", "bar")
         'foo'
-    
+
     """
     return _strips('r', text, remove)
 
@@ -363,7 +364,7 @@ def rstrips(text, remove):
 def lstrips(text, remove):
     """
     removes the string `remove` from the left of `text`
-    
+
         >>> lstrips("foobar", "foo")
         'bar'
         >>> lstrips('http://foo.org/', ['http://', 'https://'])
@@ -372,7 +373,7 @@ def lstrips(text, remove):
         'BAZ'
         >>> lstrips('FOOBARBAZ', ['BAR', 'FOO'])
         'BARBAZ'
-    
+
     """
     return _strips('l', text, remove)
 
@@ -383,7 +384,7 @@ def strips(text, remove):
 
         >>> strips("foobarfoo", "foo")
         'bar'
-    
+
     """
     return rstrips(lstrips(text, remove), remove)
 
@@ -391,7 +392,7 @@ def strips(text, remove):
 def safeunicode(obj, encoding='utf-8'):
     r"""
     Converts any given object to unicode string.
-    
+
         >>> safeunicode('hello')
         u'hello'
         >>> safeunicode(2)
@@ -414,8 +415,8 @@ def safeunicode(obj, encoding='utf-8'):
 
 def safestr(obj, encoding='utf-8'):
     r"""
-    Converts any given object to utf-8 encoded string. 
-    
+    Converts any given object to utf-8 encoded string.
+
         >>> safestr('hello')
         'hello'
         >>> safestr(u'\u1234')
@@ -443,12 +444,12 @@ def timelimit(timeout):
     """
     A decorator to limit a function to `timeout` seconds, raising `TimeoutError`
     if it takes longer.
-    
+
         >>> import time
         >>> def meaningoflife():
         ...     time.sleep(.2)
         ...     return 42
-        >>> 
+        >>>
         >>> timelimit(.1)(meaningoflife)()
         Traceback (most recent call last):
             ...
@@ -456,7 +457,7 @@ def timelimit(timeout):
         >>> timelimit(1)(meaningoflife)()
         42
 
-    _Caveat:_ The function isn't stopped after `timeout` seconds but continues 
+    _Caveat:_ The function isn't stopped after `timeout` seconds but continues
     executing in a separate thread. (There seems to be no way to kill a thread.)
 
     inspired by <http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/473878>
@@ -497,7 +498,7 @@ class Memoize:
     'Memoizes' a function, caching its return values for each input.
     If `expires` is specified, values are recalculated after `expires` seconds.
     If `background` is specified, values are recalculated in a separate thread.
-    
+
         >>> calls = 0
         >>> def howmanytimeshaveibeencalled():
         ...     global calls
@@ -593,7 +594,7 @@ class _re_subm_proxy:
 def re_subm(pat, repl, string):
     """
     Like re.sub, but returns the replacement _and_ the match object.
-    
+
         >>> t, m = re_subm('g(oo+)fball', r'f\\1lish', 'goooooofball')
         >>> t
         'foooooolish'
@@ -706,11 +707,11 @@ def iterview(x):
 
 class IterBetter:
     """
-    Returns an object that can be used as an iterator 
-    but can also be used via __getitem__ (although it 
-    cannot go backwards -- that is, you cannot request 
+    Returns an object that can be used as an iterator
+    but can also be used via __getitem__ (although it
+    cannot go backwards -- that is, you cannot request
     `iterbetter[0]` after requesting `iterbetter[1]`).
-    
+
         >>> import itertools
         >>> c = iterbetter(itertools.count())
         >>> c[1]
@@ -818,7 +819,7 @@ def safeiter(it, cleanup=None, ignore_errors=True):
 
 
 def safewrite(filename, content):
-    """Writes the content to a temp file and then moves the temp file to 
+    """Writes the content to a temp file and then moves the temp file to
     given filename to avoid overwriting the existing file in case of errors.
     """
     f = file(filename + '.tmp', 'w')
@@ -830,7 +831,7 @@ def safewrite(filename, content):
 def dictreverse(mapping):
     """
     Returns a new dictionary with keys and values swapped.
-    
+
         >>> dictreverse({1: 2, 3: 4})
         {2: 1, 4: 3}
     """
@@ -839,9 +840,9 @@ def dictreverse(mapping):
 
 def dictfind(dictionary, element):
     """
-    Returns a key whose value in `dictionary` is `element` 
+    Returns a key whose value in `dictionary` is `element`
     or, if none exists, None.
-    
+
         >>> d = {1:2, 3:4}
         >>> dictfind(d, 4)
         3
@@ -856,7 +857,7 @@ def dictfindall(dictionary, element):
     """
     Returns the keys whose values in `dictionary` are `element`
     or, if none exists, [].
-    
+
         >>> d = {1:4, 3:4}
         >>> dictfindall(d, 4)
         [1, 3]
@@ -872,9 +873,9 @@ def dictfindall(dictionary, element):
 
 def dictincr(dictionary, element):
     """
-    Increments `element` in `dictionary`, 
+    Increments `element` in `dictionary`,
     setting it to one if it doesn't exist.
-    
+
         >>> d = {1:2, 3:4}
         >>> dictincr(d, 1)
         3
@@ -894,7 +895,7 @@ def dictadd(*dicts):
     """
     Returns a dictionary consisting of the keys in the argument dictionaries.
     If they share a key, the value from the last argument is used.
-    
+
         >>> dictadd({1: 0, 2: 0}, {2: 1, 3: 1})
         {1: 0, 2: 1, 3: 1}
     """
@@ -935,7 +936,7 @@ def restack(stack, index=0):
 def listget(lst, ind, default=None):
     """
     Returns `lst[ind]` if it exists, `default` otherwise.
-    
+
         >>> listget(['a'], 0)
         'a'
         >>> listget(['a'], 1)
@@ -950,7 +951,7 @@ def listget(lst, ind, default=None):
 def intget(integer, default=None):
     """
     Returns `integer` as an int or `default` if it can't.
-    
+
         >>> intget('3')
         3
         >>> intget('3a')
@@ -966,7 +967,7 @@ def intget(integer, default=None):
 def datestr(then, now=None):
     """
     Converts a (UTC) datetime object to a nice string representation.
-    
+
         >>> from datetime import datetime, timedelta
         >>> d = datetime(1970, 5, 1)
         >>> datestr(d, now=d)
@@ -1054,12 +1055,12 @@ def datestr(then, now=None):
 def numify(string):
     """
     Removes all non-digit characters from `string`.
-    
+
         >>> numify('800-555-1212')
         '8005551212'
         >>> numify('800.555.1212')
         '8005551212'
-    
+
     """
     return ''.join([c for c in str(string) if c.isdigit()])
 
@@ -1068,10 +1069,10 @@ def denumify(string, pattern):
     """
     Formats `string` according to `pattern`, where the letter X gets replaced
     by characters from `string`.
-    
+
         >>> denumify("8005551212", "(XXX) XXX-XXXX")
         '(800) 555-1212'
-    
+
     """
     out = []
     for c in pattern:
@@ -1158,7 +1159,7 @@ def nthstr(n):
 def cond(predicate, consequence, alternative=None):
     """
     Function replacement for if-else to use in expressions.
-        
+
         >>> x = 2
         >>> cond(x % 2 == 0, "even", "odd")
         'even'
@@ -1174,12 +1175,12 @@ def cond(predicate, consequence, alternative=None):
 class CaptureStdout:
     """
     Captures everything `func` prints to stdout and returns it instead.
-    
+
         >>> def idiot():
         ...     print "foo"
         >>> capturestdout(idiot)()
         'foo\\n'
-    
+
     **WARNING:** Not threadsafe!
     """
 
@@ -1206,7 +1207,7 @@ class Profile:
     """
     Profiles `func` and returns a tuple containing its output
     and a string with human-readable profiling information.
-        
+
         >>> import time
         >>> out, inf = profile(time.sleep)(.001)
         >>> out
@@ -1269,23 +1270,23 @@ if not hasattr(traceback, 'format_exc'):
 
 def tryall(context, prefix=None):
     """
-    Tries a series of functions and prints their results. 
-    `context` is a dictionary mapping names to values; 
+    Tries a series of functions and prints their results.
+    `context` is a dictionary mapping names to values;
     the value will only be tried if it's callable.
-    
+
         >>> tryall(dict(j=lambda: True))
         j: True
         ----------------------------------------
         results:
            True: 1
 
-    For example, you might have a file `test/stuff.py` 
-    with a series of functions testing various things in it. 
+    For example, you might have a file `test/stuff.py`
+    with a series of functions testing various things in it.
     At the bottom, have a line:
 
         if __name__ == "__main__": tryall(globals())
 
-    Then you can run `python test/stuff.py` and get the results of 
+    Then you can run `python test/stuff.py` and get the results of
     all the tests.
     """
     context = context.copy()  # vars() would update
@@ -1314,7 +1315,7 @@ def tryall(context, prefix=None):
 class ThreadedDict(threadlocal):
     """
     Thread local storage.
-    
+
         >>> d = ThreadedDict()
         >>> d.x = 1
         >>> d.x
@@ -1417,12 +1418,12 @@ threadeddict = ThreadedDict
 def autoassign(self, locals):
     """
     Automatically assigns local variables to `self`.
-    
+
         >>> self = storage()
         >>> autoassign(self, dict(a=1, b=2))
         >>> self
         <Storage {'a': 1, 'b': 2}>
-    
+
     Generally used in `__init__` methods, as in:
 
         def __init__(self, foo, bar, baz=1): autoassign(self, locals())
@@ -1436,7 +1437,7 @@ def autoassign(self, locals):
 def to36(q):
     """
     Converts an integer to base 36 (a useful scheme for human-sayable IDs).
-    
+
         >>> to36(35)
         'z'
         >>> to36(119292)
@@ -1447,9 +1448,9 @@ def to36(q):
         '0'
         >>> to36(-393)
         Traceback (most recent call last):
-            ... 
+            ...
         ValueError: must supply a positive integer
-    
+
     """
     if q < 0: raise ValueError, "must supply a positive integer"
     letters = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -1484,17 +1485,17 @@ def safemarkdown(text):
 def sendmail(from_address, to_address, subject, message, headers=None, **kw):
     """
     Sends the email message `message` with mail and envelope headers
-    for from `from_address_` to `to_address` with `subject`. 
-    Additional email headers can be specified with the dictionary 
+    for from `from_address_` to `to_address` with `subject`.
+    Additional email headers can be specified with the dictionary
     `headers.
-    
+
     Optionally cc, bcc and attachments can be specified as keyword arguments.
-    Attachments must be an iterable and each attachment can be either a 
-    filename or a file object or a dictionary with filename, content and 
+    Attachments must be an iterable and each attachment can be either a
+    filename or a file object or a dictionary with filename, content and
     optionally content_type keys.
 
     If `web.config.smtp_server` is set, it will send the message
-    to that SMTP server. Otherwise it will look for 
+    to that SMTP server. Otherwise it will look for
     `/usr/sbin/sendmail`, the typical location for the sendmail-style
     binary. To use sendmail from a different path, set `web.config.sendmail_path`.
     """
@@ -1505,7 +1506,7 @@ def sendmail(from_address, to_address, subject, message, headers=None, **kw):
         if isinstance(a, dict):
             mail.attach(a['filename'], a['content'], a.get('content_type'))
         elif hasattr(a, 'read'):  # file
-            filename = os.path.basename(getattr(a, "name", ""))
+            filename = os.path.basename(getattr(a, "names", ""))
             content_type = getattr(a, 'content_type', None)
             mail.attach(filename, a.read(), content_type)
         elif isinstance(a, basestring):
@@ -1691,20 +1692,7 @@ from xml.etree.ElementTree import tostring
 PY3 = sys.version_info[0] == 3
 PY2 = not PY3
 
-PLUGINS_SUBDIR = b'plugins' if PY2 else 'plugins'
-
-
-def get_sender_username(mess):
-    """Extract the sender's user name from a message"""
-    type = mess.getType()
-    jid = mess.getFrom()
-    if type == "groupchat":
-        username = jid.getResource()
-    elif type == "chat":
-        username = jid.getNode()
-    else:
-        username = ""
-    return username
+PLUGINS_SUBDIR = b'user' if PY2 else 'user'
 
 
 def format_timedelta(timedelta):
