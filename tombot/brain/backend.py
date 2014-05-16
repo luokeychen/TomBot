@@ -116,7 +116,7 @@ class Backend(object):
         else:
             self.broker_socket = holder.broker_socket
 
-        self.bot_alt_prefixes = config.bot_alt_prefixes
+        self.names = tuple(name.lower() for name in config.names)
 
         self.room_manager = RoomManager()
 
@@ -130,7 +130,6 @@ class Backend(object):
 
         self.commands = {}
         self.re_commands = {}
-        self.bot_name = tuple(name.lower() for name in config.names)
         self.sessions = {}
 
     def get_commands(self):
@@ -178,6 +177,7 @@ class Backend(object):
 
         msg_type = mess.msg_type
         user = mess.user
+        message_id = mess.message_id
         content = mess.content
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
@@ -187,8 +187,9 @@ class Backend(object):
             logger.warn("unhandled message msg_type %s" % mess)
             return False
 
+        logger.debug("*** Message_ID = %s" % message_id)
         logger.debug("*** user = %s" % user)
-        logger.debug("*** username = %s" % username)
+        # logger.debug("*** username = %s" % username)
         logger.debug("*** msg_type = %s" % msg_type)
         logger.debug("*** content = %s" % content)
 
@@ -202,18 +203,18 @@ class Backend(object):
         prefixed = False  # Keeps track whether content was prefixed with a bot prefix
         only_check_re_command = False  # Becomes true if content is determed to not be a regular command
         tomatch = content.lower()
-        if len(self.bot_alt_prefixes) > 0 and tomatch.startswith(self.bot_name):
+        if len(self.names) > 0 and tomatch.startswith(self.names):
             # Yay! We were called by one of our alternate prefixes. Now we just have to find out
             # which one... (And find the longest matching, in case you have 'err' and 'errbot' and
             # someone uses 'errbot', which also matches 'err' but would leave 'bot' to be taken as
             # part of the called command in that case)
             prefixed = True
             longest = 0
-            for prefix in self.bot_alt_prefixes:
-                l = len(prefix)
-                if tomatch.startswith(prefix) and l > longest:
+            for name in self.names:
+                l = len(name)
+                if tomatch.startswith(name) and l > longest:
                     longest = l
-            logger.debug("Called with alternate prefix '{}'".format(content[:longest]))
+            logger.debug("Called with alternate name '{}'".format(content[:longest]))
             content = content[longest:]
 
             # Now also remove the separator from the content
@@ -223,10 +224,10 @@ class Backend(object):
                 l = len(sep)
                 if content[:l] == sep:
                     content = content[l:]
-        elif not content.startswith(self.bot_name):
+        elif not content.startswith(config.prefix):
             only_check_re_command = True
-        if content.startswith(self.bot_name):
-            content = content[len(self.bot_name):]
+        if content.startswith(config.prefix):
+            content = content[len(config.prefix):]
             prefixed = True
 
         content = content.strip()
@@ -249,13 +250,13 @@ class Backend(object):
                     if len(text_split) > 1:
                         args = ' '.join(text_split[1:])
 
-            if command == self.bot_name:  # we did "!!" so recall the last command
+            if content == '!':  # we did "!!" so recall the last command
                 if len(user_cmd_history):
                     cmd, args = user_cmd_history[-1]
                 else:
                     return False  # no command in history
-            elif command.isdigit():  # we did "!#" so we recall the specified command
-                index = int(command)
+            elif content and content.isdigit():  # we did "!#" so we recall the specified command
+                index = int(content)
                 if len(user_cmd_history) >= index:
                     cmd, args = user_cmd_history[-index]
                 else:
@@ -295,6 +296,7 @@ class Backend(object):
                     reply = self.MSG_UNKNOWN_COMMAND % {'command': command}
                 if reply:
                     self.send_simple_reply(mess, reply)
+
         return True
 
     def _process_command(self, mess, cmd, args, match):
@@ -323,6 +325,7 @@ class Backend(object):
 
         if f._tom_command_historize:
             user_cmd_history.append((cmd, args))  # add it to the history only if it is authorized to be so
+            mess.session['history'].append((cmd, args))
 
         # Don't check for None here as None can be a valid argument to split.
         # '' was chosen as default argument because this isn't a valid argument to split()
@@ -356,8 +359,8 @@ class Backend(object):
             return str(reply)
 
         def send_reply(reply):
-            for part in split_string_after(reply, self.MESSAGE_SIZE_LIMIT):
-                self.send_simple_reply(mess, part)
+            mess.session['outbox'] = split_string_after(reply, self.MESSAGE_SIZE_LIMIT)
+            mess.send_next()
 
         commands = self.re_commands if match else self.commands
         try:

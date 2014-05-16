@@ -98,16 +98,16 @@ class Client(WebQQClient):
             self.handler.r = r
             self.handler.uin = uin
 
-        if USE_HTTP:
-            logger.info("请打开 http://{0}:{1} 输入验证码"
-                        .format(HTTP_HOST, HTTP_PORT))
-        else:
-            logger.info(u"验证码本地路径为: {0}".format(self.hub.checkimg_path))
-            check_code = None
-            while not check_code:
-                check_code = raw_input("输入验证码: ")
-            self.enter_verify_code(check_code, r, uin)
-            return
+        # if USE_HTTP:
+        #     logger.info("请打开 http://{0}:{1} 输入验证码"
+        #                 .format(HTTP_HOST, HTTP_PORT))
+        # else:
+        logger.info(u"验证码本地路径为: {0}".format(self.hub.checkimg_path))
+        check_code = None
+        while not check_code:
+            check_code = raw_input("输入验证码: ")
+        self.enter_verify_code(check_code, r, uin)
+        return
 
         if send_notice_email():
             logger.info("发送通知邮件成功")

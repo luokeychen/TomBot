@@ -34,7 +34,6 @@
 #  Date        : 2014-03-08
 #  Description : user and room management
 from Queue import Queue
-
 from collections import deque
 from hashlib import sha1
 import os
@@ -43,7 +42,7 @@ import datetime
 import pickle
 import base64
 
-from tombot.common import log, config, utils
+from tombot.common import log, config
 
 
 logger = log.logger
@@ -241,21 +240,23 @@ class Session(object):
         'session_id',
         '__getitem__',
         '__setitem__',
-        '__delitem__'
+        '__delitem__',
+        'queue'
     ]
 
     def __init__(self, rid, uid):
-        self._data = utils.threadeddict()
+        # web.py make it thread local, BUT, we must share it
+        # self._data = utils.threadeddict()
         self._killed = False
         self.session_id = self.generate_session_id(rid, uid)
-        # self._data = dict()
+        self._data = dict()
         self._data['session_id'] = self.generate_session_id(rid, uid)
         self._data['is_wait'] = False
         self._data['rid'] = rid
         self._data['uid'] = uid
         self._data['last'] = None
         self._data['history'] = deque(maxlen=10)
-        # self.queue = Queue(1)
+        self.queue = Queue(1)
 
         self.store = store
 

@@ -84,5 +84,5 @@ backlist = yaml_dict['plugin'].get('backlist')
 # plugin_dirs = ['/home/konglx/project/TomBot/tombot/user']
 
 admins = yaml_dict['backend'].get('admins') or 'konglx'
-bot_alt_prefixes = yaml_dict['backend'].get('bot_alt_prefixes')
+prefix = yaml_dict['backend'].get('prefix') or '!'
 bot_alt_separators = yaml_dict['backend'].get('bot_alt_separators')

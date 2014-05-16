@@ -33,13 +33,13 @@
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-02-09
 #  Description : engine for TomBot
-
-
+import Queue
 import json
 import textwrap
 import logging
 import os
 import re
+from uuid import uuid1
 from threading import Timer, current_thread
 
 from helpers import make_msg
@@ -103,8 +103,9 @@ class Message(object):
     '''
 
     #retcode: 0 normal 101 warn 102 error 1001 null
-    def __init__(self, message, socket):
+    def __init__(self, message):
         self.msg = message
+        self.message_id = uuid1()
         self.identity = message[0]
         msg_body = json.loads(message[1])
 
@@ -113,24 +114,38 @@ class Message(object):
         self.user = msg_body['user']
         self.id = msg_body['id']
         # self.content, self.msg_type, self.user_id, user = message[1:]
-        self.socket = socket
+        self.socket = holder.broker_socket
         self.session = None
 
     def _split_chunk(self, string, length):
         if length >= 4096:
-            logger.warn("Page too long, may can't been proceed")
+            logger.warn("Page too long, may can't be proceed")
 
         lines = textwrap.wrap(string, width=length)
         return lines
 
     def get_input(self):
-        self.session['iswait'] = True
+        self.session['is_wait'] = True
+        try:
+            user_input = self.session.queue.get(timeout=10)
+        except Queue.Empty:
+            self.warn('Input timeout, task canceled')
+            return None
+        finally:
+            self.session['is_wait'] = False
+
+        return user_input
 
     def send_next(self):
-        if not self.session['next']:
+        if not self.session['outbox']:
             self.info('No more content to display.')
         else:
-            self.send(self.session['next'])
+            try:
+                out_msg = self.session['outbox'].next()
+                out_msg += '\nType more to see more details.'
+                self.send(out_msg)
+            except StopIteration:
+                self.warn('No more content to display.')
 
     def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
         # if not isinstance(self.content, str) or not isinstance(self.content, unicode):
@@ -177,7 +192,7 @@ class Message(object):
 
 class EngineBase(StoreMixin):
     """
-     This class handle the basic needs of bot user like loading, unloading and creating a storage
+     This class handle the basic needs of bot plugin like loading, unloading and creating a storage
      It is the main contract between the user and the bot
     """
 
@@ -425,6 +440,7 @@ class BuiltinEngine(EngineBase):
         """
             Override to get a notified on *ANY* message.
             If you are interested only by chatting message you can filter for example message.getType() in ('groupchat', 'chat')
+            Threre's no threading support with this, so dont put any block code here.
         """
         pass
 

@@ -25,5 +25,6 @@ class Ping(Engine):
         message.send(random.choice(self.greets))
 
     def callback_message(self, message):
-        if message.content.find('dbg') != -1 or message.content.find(u'大表哥') != -1:
+        if message.content.lower().find('dbg') != -1 or message.content.find(u'大表哥') != -1:
             message.info('我听到似乎有人提到了我们伟大的DBG？')
+

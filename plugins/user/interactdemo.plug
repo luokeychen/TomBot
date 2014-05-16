@@ -1,0 +1,9 @@
+[Core]
+Name = Interact
+Module = interactdemo
+
+[Documentation]
+Description = A demo for showing interact control.
+
+[Python]
+Version = 2+

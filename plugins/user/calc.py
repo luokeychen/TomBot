@@ -4,6 +4,7 @@ from __future__ import division
 import re
 
 from tombot.common.utils import timelimit, TimeoutError
+from math import *
 from tombot import botcmd
 from tombot import Engine
 

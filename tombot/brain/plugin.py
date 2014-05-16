@@ -32,8 +32,8 @@
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-03-29
-#  Description : manage user
-# TODO make ansible and builtins and user user separately
+#  Description : manage plugins
+# TODO make ansible and builtins and user plugin separately
 
 import sys
 import os
@@ -68,9 +68,9 @@ def init_plugin_manager():
         tom_plugin_manager = PluginManager()
         tom_plugin_manager.setPluginPlaces(config.plugin_dirs)
         tom_plugin_manager.setPluginInfoExtension('plug')
-        # 3 types of user, Built-in for plugin come with Tom,
+        # 3 types of plugins, Built-in for plugin come with Tom,
         # Ansible for ansible simplerunner or playbook running on tom
-        # User for user-defined user
+        # User for user-defined plugin
         tom_plugin_manager.setCategoriesFilter({
             'Built-in': BuiltinEngine,
             'Ansible': AnsibleEngine,
@@ -187,7 +187,7 @@ def update_plugin_places(list):
     try:
         tom_plugin_manager.loadPlugins(add_candidate)
     except Exception as _:
-        logger.exception("Error while loading user")
+        logger.exception("Error while loading plugin")
 
     # FIXME temporary keep it from errbot
     errors = None
@@ -196,7 +196,7 @@ def update_plugin_places(list):
 
 
 def get_all_plugins():
-    logger.debug("All user: %s" % tom_plugin_manager.getAllPlugins())
+    logger.debug("All plugins: %s" % tom_plugin_manager.getAllPlugins())
     return tom_plugin_manager.getAllPlugins()
 
 

@@ -33,7 +33,8 @@ class SimSimiTalk(object):
         self.fetch_kwargs = {}
         self.fetch_kwargs.update(proxy_host='192.168.13.19', proxy_port='7777')
 
-        self._setup_cookie()
+        t = threading.Thread(target=self._setup_cookie())
+        t.start()
 
     def _set_profile(self, resp):
         def callback(resp):

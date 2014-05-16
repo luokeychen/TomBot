@@ -39,11 +39,5 @@ from tombot import BuiltinEngine
 
 class More(BuiltinEngine):
     def callback_message(self, message):
-        message.send('Type "more" to see content.')
-        user_input = message.get_input()
-        if user_input == 'more':
+        if message.content.strip() == 'more':
             message.send_next()
-            return True
-        else:
-            message.send('Type "more" to see content.')
-            return False

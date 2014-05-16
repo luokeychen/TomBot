@@ -78,21 +78,21 @@ class TomBot(Backend, StoreMixin):
             except Exception as _:
                 logger.exception("Crash in a callback_message handler")
 
-    def session_control(self, message):
-        current_session = message.session
-        if current_session['iswait']:
-            pass
-
     def callback_message(self, message):
         logger.debug('Receive message from client: {}'.format(message[0]))
         logger.debug('Full message body: {}'.format(message))
-        msg_obj = Message(message, holder.broker_socket)
+        msg_obj = Message(message)
         session_id = Session.generate_session_id(msg_obj.id, msg_obj.user)
         self.sessions[session_id] = self.sessions.get(session_id) or Session(msg_obj.id, msg_obj.user)
         current_session = self.sessions[session_id]
         logger.debug('Global Sessions: {}'.format(self.sessions))
         logger.debug('Current session: {}'.format(current_session._data))
         msg_obj.session = current_session
+
+        if msg_obj.session['is_wait']:
+            # BUG actually, needs a lock here if user type fast enough
+            msg_obj.session.queue.put(msg_obj.content)
+            return
 
         if super(TomBot, self).callback_message(msg_obj):
             # Act only in the backend tells us that this message is OK to broadcast
@@ -105,7 +105,7 @@ class TomBot(Backend, StoreMixin):
                     logger.exception("Crash in a callback_message handler")
 
     def activate_non_started_plugins(self):
-        logger.info('Activating all the user...')
+        logger.info('Activating all the plugins...')
         errors = ''
         for pluginInfo in get_all_plugins():
             try:
@@ -187,14 +187,14 @@ class TomBot(Backend, StoreMixin):
         logger.info('Activate internal commands')
         loading_errors = self.activate_non_started_plugins()
         logger.info(loading_errors)
-        logger.info('Notifying connection to all the user...')
+        logger.info('Notifying connection to all the plugins...')
         self.signal_connect_to_all_plugins()
         logger.info('Plugin activation done.')
         self.inject_commands_from(self)
 
     def disconnect_callback(self):
         self.remove_commands_from(self)
-        logger.info('Disconnect callback, deactivating all the user.')
+        logger.info('Disconnect callback, deactivating all the plugins.')
         deactivate_all_plugins()
 
     def shutdown(self):
@@ -208,11 +208,11 @@ class TomBot(Backend, StoreMixin):
     @staticmethod
     def formatted_plugin_list(active_only=True):
         """
-        Return a formatted, plain-text list of loaded user.
+        Return a formatted, plain-text list of loaded plugins.
 
-        When active_only=True, this will only return user which
+        When active_only=True, this will only return plugins which
         are actually active. Otherwise, it will also include inactive
-        (blacklisted) user.
+        (blacklisted) plugins.
         """
         if active_only:
             all_plugins = get_all_active_plugin_names()
@@ -432,11 +432,16 @@ class TomBot(Backend, StoreMixin):
     def history(self, mess, args):
         """display the command history"""
         answer = []
-        user_cmd_history = self.cmd_history[self.get_sender_username(mess)]
+        # user_cmd_history = self.cmd_history[self.get_sender_username(mess)]
+        user_cmd_history = mess.session['history']
         l = len(user_cmd_history)
         for i in range(0, l):
             c = user_cmd_history[i]
-            answer.append('%2i:%s%s %s' % (l - i, self.prefix, c[0], c[1]))
+            answer.append('%2i:%s %s %s' % (l - i, self.prefix, c[0], c[1]))
+        if not answer:
+            return 'Your command history is empty.'
+        answer.append('\nType {}# like !2 to perform an execute from history.'.format(self.prefix))
+        answer.append('And !! for last history item.')
         return '\n'.join(answer)
 
     #noinspection PyUnusedLocal

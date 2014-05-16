@@ -1,0 +1,9 @@
+[Core]
+Name = More
+Module = more
+
+[Documentation]
+Description = Paging support
+
+[Python]
+Version = 2+

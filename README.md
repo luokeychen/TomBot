@@ -32,7 +32,7 @@ Plugin
 继承Engine, 类的docstring会被help.py读取并显示在help中(update 2013-03-09 此机制已废除)，被`respond_handler`修饰的方法会在收到消息时自动调用，并匹配正则，matches参数可以使用matches.group(1)这样的方式获取括号中的匹配项
 详见scripts目录下的template.py
 
-Inspired by Hubot!
+Inspired by Hubot && Errbot!
 
 配置
 ===============
@@ -57,11 +57,11 @@ TODO
  * 完善插件异常处理机制 done 2014-3-15
  * 添加多机命令执行功能 done
  * 完善基础库
- * 可自由添加/减少backend
- * 针对用户的命令上下文
- * 添加数据库支持
+ * 可自由添加/减少backend dep
+ * 针对用户的命令上下文 done
+ * 添加数据库支持 done
  * 增加权限管理
  * SSH
  * 考虑增强zmq的安全性
- * 整理、规范logging
+ * 整理、规范logging done
  * 整合wssh
