@@ -28,7 +28,7 @@
 #  are those of the authors and should not be interpreted as representing
 #  official policies, either expressedor implied, of konglx.
 #
-#  File        : more.py
+#  File        : interactive.py
 #  Author      : konglx
 #  Email       : jayklx@gmail.com
 #  Date        : 2014-04-27
@@ -37,7 +37,7 @@
 from tombot import BuiltinEngine
 
 
-class More(BuiltinEngine):
+class Interactive(BuiltinEngine):
     def callback_message(self, message):
         if message.content.strip() == 'more':
             message.send_next()

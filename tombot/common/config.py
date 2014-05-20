@@ -78,7 +78,6 @@ capture = yaml_dict['broker'].get('capture')
 max_message_size = yaml_dict['backend'].get('max_message_size')
 
 plugin_dirs = yaml_dict['plugin'].get('plugin_dirs')
-backlist = yaml_dict['plugin'].get('backlist')
 # TODO make possible to assign multiple plugin dir
 # plugin_dirs.append('user')
 # plugin_dirs = ['/home/konglx/project/TomBot/tombot/user']

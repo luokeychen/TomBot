@@ -99,7 +99,6 @@ class Message(object):
     '''包装消息，方便保存上下文
 
     :param message: 消息tuple
-    :param socket: pull模式的zmq socket
     '''
 
     #retcode: 0 normal 101 warn 102 error 1001 null
@@ -113,7 +112,6 @@ class Message(object):
         self.msg_type = msg_body['type']
         self.user = msg_body['user']
         self.id = msg_body['id']
-        # self.content, self.msg_type, self.user_id, user = message[1:]
         self.socket = holder.broker_socket
         self.session = None
 

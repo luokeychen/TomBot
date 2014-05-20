@@ -19,7 +19,7 @@ backend:
     # 是否调试模式
     debug: True
     workers: 5
-    max_message_size: 1024
+    max_message_size: 4096
     # send full message when exceed max_message_size limit
     send_full_msg_when_exceed: True
     hide_restrict_command: False
@@ -43,8 +43,6 @@ redis_port : 9673
 plugin:
   plugin_dirs:
     - /home/konglx/project/TomBot/plugins
-  backlist:
-    - ping
 
 ansible:
   - simple_runner

@@ -3,6 +3,7 @@ import os
 import gc
 from datetime import datetime
 import inspect
+from pprint import pformat
 from zmq.eventloop import ioloop
 from zmq.eventloop import zmqstream
 
@@ -151,6 +152,7 @@ class TomBot(Backend, StoreMixin):
         return name in self.get_blacklisted_plugin()
 
     def blacklist_plugin(self, name):
+        """Will put a flag to bot's shelf store"""
         if self.is_plugin_blacklisted(name):
             logger.warning('Plugin %s is already blacklisted' % name)
             return 'Plugin %s is already blacklisted' % name
@@ -218,7 +220,7 @@ class TomBot(Backend, StoreMixin):
             all_plugins = get_all_active_plugin_names()
         else:
             all_plugins = get_all_plugin_names()
-        return "\n".join(("• " + plugin for plugin in all_plugins))
+        return "\n".join(("- " + plugin for plugin in all_plugins))
 
     #noinspection PyUnusedLocal
     @botcmd
@@ -251,7 +253,7 @@ class TomBot(Backend, StoreMixin):
             loads = None
 
         # plugins_statuses = sorted(plugins_statuses, key=lambda c: c[2])
-        return {'plugins': plugins_statuses, 'loads': loads, 'gc': gc.get_count()}
+        return pformat({'plugins': plugins_statuses, 'loads': loads, 'gc': gc.get_count()})
 
     #noinspection PyUnusedLocal
     @botcmd
@@ -273,13 +275,18 @@ class TomBot(Backend, StoreMixin):
     #noinspection PyUnusedLocal
     @botcmd(admin_only=True)
     def restart(self, mess, args):
-        """ restart the bot """
+        """ Restart the bot """
         mess.send("Deactivating all the plugins...")
         deactivate_all_plugins()
         mess.send("Restarting")
         self.shutdown()
         global_restart()
         return "I'm restarting..."
+
+    @botcmd
+    def list_plugin(self, message, args):
+        """ List all plugins """
+        return self.formatted_plugin_list(active_only=False)
 
     #noinspection PyUnusedLocal
     @botcmd(admin_only=True)
@@ -455,12 +462,12 @@ class TomBot(Backend, StoreMixin):
 
     #noinspection PyUnusedLocal
     @botcmd
-    def apropos(self, mess, args):
+    def usage(self, mess, args):
         """   Returns a help string listing available options.
 
         Automatically assigned to the "help" command."""
         if not args:
-            return 'Usage: ' + self.prefix + 'apropos search_term'
+            return 'Usage: ' + self.prefix + ' usage search_term'
 
         description = 'Available commands:\n'
 
@@ -477,7 +484,7 @@ class TomBot(Backend, StoreMixin):
         usage = ''
         for clazz in sorted(clazz_commands):
             usage += '\n'.join(sorted([
-                '\t' + self.prefix + '%s: %s' % (
+                '\t' + self.prefix + ' %s: %s' % (
                     name.replace('_', ' ', 1), (command.__doc__ or '(undocumented)').strip().split('\n', 1)[0])
                 for (name, command) in clazz_commands[clazz] if
                 args is not None and command.__doc__ is not None and args.lower() in command.__doc__.lower() and name != 'help' and not command._tom_command_hidden

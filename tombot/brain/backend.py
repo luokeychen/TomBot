@@ -359,8 +359,11 @@ class Backend(object):
             return str(reply)
 
         def send_reply(reply):
-            mess.session['outbox'] = split_string_after(reply, self.MESSAGE_SIZE_LIMIT)
-            mess.send_next()
+            if len(reply) <= self.MESSAGE_SIZE_LIMIT:
+                self.send_simple_reply(mess, reply)
+            else:
+                mess.session['outbox'] = split_string_after(reply, self.MESSAGE_SIZE_LIMIT)
+                mess.send_next()
 
         commands = self.re_commands if match else self.commands
         try:

@@ -1,6 +1,6 @@
 [Core]
-Name = More
-Module = more
+Name = Interactive
+Module = interactive
 
 [Documentation]
 Description = Paging support
