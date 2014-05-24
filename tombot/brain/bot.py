@@ -324,15 +324,6 @@ class TomBot(Backend, StoreMixin):
         r = self.activate_plugin(args)
         return r
 
-    @botcmd
-    def more(self, mess, args):
-        """
-        command to implement paging
-        :param mess:
-        :param args:
-        """
-        pass
-
     #noinspection PyUnusedLocal
     @botcmd(admin_only=True)
     def unload(self, mess, args):

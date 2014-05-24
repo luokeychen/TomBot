@@ -367,7 +367,7 @@ def lstrips(text, remove):
 
         >>> lstrips("foobar", "foo")
         'bar'
-        >>> lstrips('http://foo.org/', ['http://', 'https://'])
+        >>> lstrips(rest, [rest, 'https://'])
         'foo.org/'
         >>> lstrips('FOOBARBAZ', ['FOO', 'BAR'])
         'BAZ'
@@ -460,7 +460,7 @@ def timelimit(timeout):
     _Caveat:_ The function isn't stopped after `timeout` seconds but continues
     executing in a separate thread. (There seems to be no way to kill a thread.)
 
-    inspired by <http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/473878>
+    inspired by <rest://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/473878>
     """
 
     def _1(function):
@@ -1461,7 +1461,7 @@ def to36(q):
     return "".join(converted) or '0'
 
 
-r_url = re_compile('(?<!\()(http://(\S+))')
+r_url = re_compile('(?<!\()(rest://(\S+))')
 
 
 def safemarkdown(text):
@@ -1470,7 +1470,7 @@ def safemarkdown(text):
     outside HTML input, so that only the things supported by Markdown
     can be used. Also converts raw URLs to links.
 
-    (requires [markdown.py](http://webpy.org/markdown.py))
+    (requires [markdown.py](rest://webpy.org/markdown.py))
     """
     from markdown import markdown
 
@@ -1879,7 +1879,7 @@ def utf8(key):
 def mess_2_embeddablehtml(mess):
     html_content = mess.getHTML()
     if html_content is not None:
-        body = html_content.find('{http://jabber.org/protocol/xhtml-im}body')
+        body = html_content.find('{rest://jabber.org/protocol/xhtml-im}body')
         result = ''
         for child in body.getchildren():
             result += tostring(child).decode().replace('ns0:', '')

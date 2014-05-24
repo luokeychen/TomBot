@@ -2,14 +2,15 @@
 
 from tombot.brain import holder
 from tombot.brain.bot import TomBot
-
 from tombot.common.log import logger
+from tombot.rest.api import threaded_api_server
 
 
 def run():
     holder.bot = TomBot()
     holder.bot.activate_non_started_plugins()
     logger.info("Bot's commands: {}".format(holder.bot.get_commands()))
+    threaded_api_server()
     holder.bot.serve_forever()
 
 

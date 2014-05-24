@@ -64,7 +64,7 @@ def get_items():
     count = 0
     outfile = open(qiushi, 'w')
     for i in range(1, 2):
-        url = "http://qiushibaike.com/hot/page/%d" % i
+        url = "rest://qiushibaike.com/hot/page/%d" % i
         data = urllib2.urlopen(url).readlines()
         soup = BeautifulSoup("".join(data))
         contents = soup.findAll('div', "content")

@@ -65,3 +65,5 @@ TODO
  * 考虑增强zmq的安全性
  * 整理、规范logging done
  * 整合wssh
+ * 分页，支持读取用户输入  done
+ * REST API

@@ -42,7 +42,7 @@ class Flow(Engine):
                     FROM coo.FLOW T1,coo.TACHE T2 where t1.flow_id = t2.flow_id) t3
                     where t3.title like ''' + "'" + title + "'" + ' order by flow_type desc'
         sql2 = sql2.encode('gbk')
-        url = 'http://117.27.132.23:20006/workshop/form/index.jsp?flowId='
+        url = 'rest://117.27.132.23:20006/workshop/form/index.jsp?flowId='
         if serial:
             try:
                 cs.execute(sql1, serial=serial)

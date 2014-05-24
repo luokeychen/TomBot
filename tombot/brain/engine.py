@@ -112,8 +112,12 @@ class Message(object):
         self.msg_type = msg_body['type']
         self.user = msg_body['user']
         self.id = msg_body['id']
+        self.style = msg_body.get('style') or const.DEFAULT_STYLE
         self.socket = holder.broker_socket
         self.session = None
+
+    def set_style(self, style):
+        self.style = style
 
     def _split_chunk(self, string, length):
         if length >= 4096:
@@ -145,7 +149,7 @@ class Message(object):
             except StopIteration:
                 self.warn('No more content to display.')
 
-    def send(self, content, style=const.DEFAULT_STYLE, retcode=0, user=None, split=0):
+    def send(self, content, retcode=0, user=None, split=0):
         # if not isinstance(self.content, str) or not isinstance(self.content, unicode):
         #     logger.warn('Message content is not `str` or `unicode`, can not be send!')
         #     return
@@ -165,7 +169,7 @@ class Message(object):
                                         json.dumps(warn_msg)])
             content = content[:4096]
         msg = make_msg(retcode=retcode, content=content, user=self.user,
-                       type_=self.msg_type, id_=self.id, style=style)
+                       type_=self.msg_type, id_=self.id, style=self.style)
 
         self.socket.send_multipart([self.identity,
                                     json.dumps(msg)])
@@ -173,19 +177,19 @@ class Message(object):
         logger.info('Push message to Client: {0!r}'.format(msg))
 
     def ok(self, content):
-        self.send(content, style=const.OK_STYLE, retcode=0)
+        self.send(content, retcode=0)
 
     def info(self, content):
-        self.send(content, style=const.INFO_STYLE)
+        self.send(content)
 
     def warn(self, content):
-        self.send(content, style=const.WARNING_STYLE, retcode=101)
+        self.send(content, retcode=101)
 
     def error(self, content):
-        self.send(content, style=const.ERROR_STYLE, retcode=102)
+        self.send(content, retcode=102)
 
     def code(self, content):
-        self.send(content, style=const.CODE_STYLE)
+        self.send(content)
 
 
 class EngineBase(StoreMixin):
@@ -371,7 +375,7 @@ class Engine(EngineBase):
             Sends asynchronously a message a room or a user.
              if it is a room message_type needs to by 'groupchat' and user the room.
         """
-        return holder.bot.send(user, text, in_reply_to, message_type)
+        return holder.bot.send(user, in_reply_to, message_type)
 
     def bare_send(self, xmppy_msg):
         """

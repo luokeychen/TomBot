@@ -38,8 +38,8 @@
 import os
 import sys
 import zmq
-import zmq.auth
-from zmq.auth.thread import ThreadAuthenticator
+# import zmq.auth
+# from zmq.auth.thread import ThreadAuthenticator
 import threading
 from tombot import log
 
@@ -54,8 +54,8 @@ context = zmq.Context(1)
 dealer = context.socket(zmq.DEALER)
 dealer.setsockopt(zmq.IDENTITY, 'SHELL')
 # dealer.curve_server = True
-public_key, secret_key = zmq.auth.load_certificate(config.home + os.sep + 'certs' + os.sep + 'tom.key_secret')
-logger.debug('Pub Key: {0}, Secret Key: {1}'.format(public_key, secret_key))
+# public_key, secret_key = zmq.auth.load_certificate(config.home + os.sep + 'certs' + os.sep + 'tom.key_secret')
+# logger.debug('Pub Key: {0}, Secret Key: {1}'.format(public_key, secret_key))
 # dealer.curve_secretkey = secret_key
 # dealer.curve_publickey = public_key
 

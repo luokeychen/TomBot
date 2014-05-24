@@ -7,7 +7,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    http://www.apache.org/licenses/LICENSE-2.0
+#    rest://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -112,7 +112,7 @@ class CheckImgAPIHandler(BaseHandler):
                 self.write({"status": False, "message": u"验证码过期"})
                 self.is_exit = True
             else:
-                url = "http://{0}/check".format(self.request.host)
+                url = "rest://{0}/check".format(self.request.host)
                 self.write({"status": True, "require": True, "url": url})
             return
         self.write({"status": True, "require": False})
@@ -136,9 +136,9 @@ class SendMessageHandler(BaseHandler):
 
 
 app = Application([(r'/', CheckHandler), (r'/check', CImgHandler),
-                   (r'/api/check', CheckImgAPIHandler),
-                   (r'/api/send', SendMessageHandler),
-                   (r'/api/input', CheckHandler)
+                   (r'/rest/check', CheckImgAPIHandler),
+                   (r'/rest/send', SendMessageHandler),
+                   (r'/rest/input', CheckHandler)
 ])
 app.listen(HTTP_PORT, address=HTTP_LISTEN)
 

@@ -183,7 +183,7 @@ class Backend(object):
         user_cmd_history = self.cmd_history[username]
 
         # 3 types of QQ chat, there's sess msg_type for non-friend talk, but with security issue, don't use it
-        if msg_type not in ('buddy', 'group', 'discu'):
+        if msg_type not in ('buddy', 'group', 'discu', 'api'):
             logger.warn("unhandled message msg_type %s" % mess)
             return False
 
@@ -359,7 +359,7 @@ class Backend(object):
             return str(reply)
 
         def send_reply(reply):
-            if len(reply) <= self.MESSAGE_SIZE_LIMIT:
+            if mess.msg_type == 'api' or (reply) <= self.MESSAGE_SIZE_LIMIT:
                 self.send_simple_reply(mess, reply)
             else:
                 mess.session['outbox'] = split_string_after(reply, self.MESSAGE_SIZE_LIMIT)

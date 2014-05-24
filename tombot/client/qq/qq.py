@@ -71,7 +71,7 @@ def send_notice_email():
 
     msg = MIMEText(""" 你的WebQQ机器人需要一个验证码,
                    请打开你的服务器输入验证码:
-                   http://{0}:{1}""".format(HTTP_HOST,
+                   rest://{0}:{1}""".format(HTTP_HOST,
                                             HTTP_PORT),
                    _subtype="plain", _charset="utf-8")
     msg['Subject'] = u"WebQQ机器人需要验证码"
@@ -99,7 +99,7 @@ class Client(WebQQClient):
             self.handler.uin = uin
 
         # if USE_HTTP:
-        #     logger.info("请打开 http://{0}:{1} 输入验证码"
+        #     logger.info("请打开 rest://{0}:{1} 输入验证码"
         #                 .format(HTTP_HOST, HTTP_PORT))
         # else:
         logger.info(u"验证码本地路径为: {0}".format(self.hub.checkimg_path))
