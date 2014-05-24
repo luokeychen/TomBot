@@ -126,7 +126,9 @@ class Message(object):
         lines = textwrap.wrap(string, width=length)
         return lines
 
-    def get_input(self):
+    def get_input(self, tip=None):
+        if tip:
+            self.info(tip)
         self.session['is_wait'] = True
         try:
             user_input = self.session.queue.get(timeout=10)

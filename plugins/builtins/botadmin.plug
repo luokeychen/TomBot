@@ -1,0 +1,9 @@
+[Core]
+Name = BotAdmin
+Module = botadmin
+
+[Documentation]
+Description = Commands related to Tom administration.
+
+[Python]
+Version = 2+

@@ -34,7 +34,6 @@
 #  Date        : 2014-02-09
 #  Description : TomBot Backend用于处理消息及插件
 import difflib
-
 import os
 import inspect
 from collections import defaultdict, deque
@@ -56,6 +55,11 @@ from engine import botcmd
 _path = os.path.abspath(os.path.dirname(__file__))
 
 logger = log.logger
+
+
+class ACLViolation(Exception):
+    pass
+
 
 # def check_command_access(self, mess, cmd):
 #     """
@@ -131,6 +135,24 @@ class Backend(object):
         self.commands = {}
         self.re_commands = {}
         self.sessions = {}
+        self.admins = []
+
+    def check_command_access(self, message, cmd):
+        f = self.commands[cmd] if cmd in self.commands else self.re_commands[cmd]
+        if f._tom_command_admin_only:
+            if self.auth_admin(message):
+                return True
+            else:
+                # message.warn('Command need admin privileges, please give me correct password!')
+                raise ACLViolation('Command need admin privileges')
+
+    def auth_admin(self, message):
+        password = message.get_input('Please give me your pass code.')
+        if password == config.admin_pass:
+            self.admins.append(message.user)
+            return True
+        else:
+            return False
 
     def get_commands(self):
         return self.commands
@@ -311,12 +333,11 @@ class Backend(object):
             user_cmd_history.remove((cmd, args))  # Avoids duplicate history items
 
         # FIXME There's no ACL control at this time
-        # try:
-        #     self.check_command_access(mess, cmd)
-        # except ACLViolation as e:
-        #     if not config.hide_restrict_command:
-        #         self.send_simple_reply(mess, str(e))
-        #     return
+        try:
+            self.check_command_access(mess, cmd)
+        except ACLViolation as e:
+            self.send_simple_reply(mess, str(e))
+            return
 
         f = self.re_commands[cmd] if match else self.commands[cmd]
 
@@ -467,34 +488,3 @@ class Backend(object):
         of the help message.
         """
         return ""
-
-    @botcmd
-    def help(self, mess, args):
-        """   Returns a help string listing available options.
-
-        Automatically assigned to the "help" command."""
-        if not args:
-            if self.__doc__:
-                description = self.__doc__.strip()
-            else:
-                description = 'Available commands:'
-
-            usage = '\n'.join(sorted([
-                config.names + '%s: %s' % (name, (command.__doc__ or
-                                                  '(undocumented)').strip().split('\n', 1)[0])
-                for (name, command) in self.commands.iteritems() \
-                if name != 'help' \
-                    and not command._tom_command_hidden
-            ]))
-            usage = '\n\n' + '\n\n'.join(filter(None, [usage, self.MSG_HELP_TAIL]))
-        else:
-            description = ''
-            if args in self.commands:
-                usage = (self.commands[args].__doc__ or
-                         'undocumented').strip()
-            else:
-                usage = self.MSG_HELP_UNDEFINED_COMMAND
-
-        top = self.top_of_help_message()
-        bottom = self.bottom_of_help_message()
-        return ''.join(filter(None, [top, description, usage, bottom]))

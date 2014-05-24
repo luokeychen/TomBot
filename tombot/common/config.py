@@ -85,3 +85,5 @@ plugin_dirs = yaml_dict['plugin'].get('plugin_dirs')
 admins = yaml_dict['backend'].get('admins') or 'konglx'
 prefix = yaml_dict['backend'].get('prefix') or '!'
 bot_alt_separators = yaml_dict['backend'].get('bot_alt_separators')
+
+admin_pass = 'test'
