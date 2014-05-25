@@ -76,23 +76,9 @@ def init_plugin_manager():
             'Ansible': AnsibleEngine,
             'User': Engine
         })
-        tom_plugin_manager.collectPlugins()
         holder.plugin_manager = tom_plugin_manager
     else:
         tom_plugin_manager = holder.plugin_manager
-
-
-class TomPluginManager(PluginManager):
-    def __init__(self):
-        super(TomPluginManager, self).__init__()
-        self.setPluginPlaces(config.plugin_dirs)
-        self.setPluginInfoExtension('plug')
-        self.setCategoriesFilter({
-            'Built-in': BuiltinEngine,
-            'Ansible': AnsibleEngine,
-            'User': Engine
-        })
-        self.collectPlugins()
 
 
 init_plugin_manager()

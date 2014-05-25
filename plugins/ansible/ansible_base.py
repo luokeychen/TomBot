@@ -7,11 +7,12 @@
 # Description:
 
 __author__ = 'Konglx'
+import re
 
 from tombot import botcmd
 from tombot import AnsibleEngine
+import common
 from raw import raw_runner
-from common import inventory
 
 
 class AnsibleBase(AnsibleEngine):
@@ -23,9 +24,9 @@ class AnsibleBase(AnsibleEngine):
         message.info(self.print_hosts(args))
 
     def print_hosts(self, pattern=None):
-        groups = inventory.get_groups()
+        groups = common.inventory.get_groups()
         if pattern:
-            groups = [inventory.get_group(pattern)]
+            groups = [common.inventory.get_group(pattern)]
         hosts_list = []
         for group in groups:
             hosts_list.append('---- {0} ----'.format(group.name))
@@ -41,7 +42,7 @@ class AnsibleBase(AnsibleEngine):
     @botcmd
     def list_group(self, message, args):
         """List group configured in Ansible inventory file"""
-        message.info('\n'.join([group.name for group in inventory.get_groups()]))
+        message.info('\n'.join([group.name for group in common.inventory.get_groups()]))
 
     @botcmd
     def cmd(self, message, args):
@@ -66,7 +67,7 @@ class AnsibleBase(AnsibleEngine):
             input_command = args
 
         if args.split()[0] in accept_commands:
-            result = raw_runner(input_command, pattern, inventory)
+            result = raw_runner(input_command, pattern, common.inventory)
             return result
         else:
             return '禁止执行的命令!'

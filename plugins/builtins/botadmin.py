@@ -8,21 +8,40 @@
 from datetime import datetime
 import gc
 import os
+import inspect
 from pprint import pformat
+
 from tombot import botcmd
+from tombot.brain.plugin import get_all_active_plugin_names, get_plugin_by_name, get_plugin_obj_by_name
+from tombot.brain.plugin import deactivate_all_plugins, global_restart, get_all_plugin_names, reload_plugin_by_name
 from tombot.brain import holder
-from tombot.brain.bot import get_class_that_defined_method, TomBot
-from tombot.brain.plugin import get_all_active_plugin_names, get_plugin_by_name, get_plugin_obj_by_name, \
-    deactivate_all_plugins, global_restart, get_all_plugin_names, reload_plugin_by_name
 from tombot.common import config
 from tombot.common.utils import tail, format_timedelta
 from tombot import BuiltinEngine
 
+
 __author__ = 'Konglx'
+
+
+def get_class_that_defined_method(meth):
+    for cls in inspect.getmro(type(meth.__self__)):
+        if meth.__name__ in cls.__dict__:
+            return cls
+    return None
 
 
 class BotAdmin(BuiltinEngine):
     """Commands relate to TomBot administration"""
+
+    @botcmd
+    def auth(self, message, args):
+        """ To perform a admin authentication, and keep it until restart. """
+        password = message.get_input('Please give me your pass code.')
+        if password.strip() == config.admin_pass:
+            holder.bot.admins.append(message.user)
+            message.info('Authentication success!')
+        else:
+            message.warn('Authentication failed!!!')
 
     #noinspection PyUnusedLocal
     @botcmd

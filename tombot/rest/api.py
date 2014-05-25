@@ -17,6 +17,7 @@ from tornado.escape import json_decode
 import tornado.ioloop
 
 from tombot.common import log
+from tombot.common import config
 from tombot.common.version import BOT_VERSION
 from tombot.brain.engine import Message
 from tombot.rest.webproxy import WebProxy
@@ -56,7 +57,12 @@ class SendHandler(MainHandler):
     @asynchronous
     def post(self, *args, **kwargs):
         msg = json_decode(self.request.body)
+        content = config.main_name + ' ' + msg['command'] + ' ' + msg['args']
+        msg['content'] = content
+        logger.debug(msg)
         msg_obj = Message(msg)
+        msg_obj.id = msg['id'] or 'NotProvided'
+        msg_obj.id = msg['user'] or 'NotProvided'
         msg_obj.send(msg_obj.content)
 
 

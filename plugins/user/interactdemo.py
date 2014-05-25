@@ -7,6 +7,5 @@ from tombot import Engine
 class Interact(Engine):
     @botcmd
     def ask(self, message, args):
-        message.send('Type something')
-        user_input = message.get_input()
+        user_input = message.get_input('type something')
         message.send(u'User input:{0}'.format(user_input))

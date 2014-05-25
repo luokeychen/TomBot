@@ -104,7 +104,7 @@ class Backend(object):
     MSG_ERROR_OCCURRED = '消息处理发生异常'
     MESSAGE_SIZE_LIMIT = config.max_message_size
     MSG_UNKNOWN_COMMAND = 'Unknown command: "%(command)s". ' \
-                          'Type "' + config.main_name + 'help" for available commands.'
+                          'Type "' + config.main_name + ' help" for available commands.'
     MSG_HELP_TAIL = 'Type help <command names> to get more info ' \
                     'about that specific command.'
     MSG_HELP_UNDEFINED_COMMAND = 'That command is not defined.'
@@ -140,18 +140,17 @@ class Backend(object):
     def check_command_access(self, message, cmd):
         f = self.commands[cmd] if cmd in self.commands else self.re_commands[cmd]
         if f._tom_command_admin_only:
-            if self.auth_admin(message):
-                return True
-            else:
-                # message.warn('Command need admin privileges, please give me correct password!')
-                raise ACLViolation('Command need admin privileges')
+            if not self.auth_admin(message):
+                raise ACLViolation('Command needs admin privileges but authentication failed.')
+        return True
 
     def auth_admin(self, message):
         password = message.get_input('Please give me your pass code.')
         if password == config.admin_pass:
-            self.admins.append(message.user)
+            message.ok('Authentication passed!')
             return True
         else:
+            message.warn('Authentication failed!!!')
             return False
 
     def get_commands(self):
@@ -332,12 +331,12 @@ class Backend(object):
         if (cmd, args) in user_cmd_history:
             user_cmd_history.remove((cmd, args))  # Avoids duplicate history items
 
-        # FIXME There's no ACL control at this time
-        try:
-            self.check_command_access(mess, cmd)
-        except ACLViolation as e:
-            self.send_simple_reply(mess, str(e))
-            return
+        if mess.user not in [str(a) for a in self.admins]:
+            try:
+                self.check_command_access(mess, cmd)
+            except ACLViolation as e:
+                mess.error("You don't have permission to execute this command!")
+                return
 
         f = self.re_commands[cmd] if match else self.commands[cmd]
 

@@ -42,6 +42,7 @@ import datetime
 import pickle
 import base64
 
+from tombot.brain import holder
 from tombot.common import log, config
 
 
@@ -226,7 +227,8 @@ class SessionExpired(Exception):
 # store = DiskStore('{0}/run/sessions'.format(os.getenv('TOMBOT_HOME')))
 import shelve
 
-store = ShelfStore(shelve.DbfilenameShelf('{0}/run/session.db'.format(config.home), protocol=2))
+if not holder.session_store:
+    holder.session_store = ShelfStore(shelve.DbfilenameShelf('{0}/run/session.db'.format(config.home), protocol=2))
 
 
 class Session(object):
@@ -258,7 +260,7 @@ class Session(object):
         self._data['history'] = deque(maxlen=10)
         self.queue = Queue(1)
 
-        self.store = store
+        self.store = holder.session_store
 
         self.__getitem__ = self._data.__getitem__
         self.__setitem__ = self._data.__setitem__

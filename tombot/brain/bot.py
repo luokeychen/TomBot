@@ -1,9 +1,6 @@
 # -*- coding:utf-8 -*-
-import os
-import gc
 from datetime import datetime
 import inspect
-from pprint import pformat
 from zmq.eventloop import ioloop
 from zmq.eventloop import zmqstream
 
@@ -11,29 +8,20 @@ ioloop.install()
 
 from tombot.brain.backend import Backend
 from tombot.brain.storage import StoreMixin
-from tombot.brain.engine import botcmd
 from tombot.brain.engine import Message
 from tombot.common import config
 from tombot.brain import holder
 from tombot.common import log
-from tombot.common.utils import tail, format_timedelta
-from tombot.brain.session import Session, store
+from tombot.brain.session import Session
 from tombot.brain.plugin import (
     get_all_active_plugin_names, deactivate_all_plugins, get_all_active_plugin_objects,
-    get_all_plugins, global_restart, get_all_plugin_names, deactivate_plugin_by_name, activate_plugin_by_name,
-    get_plugin_obj_by_name, reload_plugin_by_name, update_plugin_places, get_plugin_by_name
+    get_all_plugins, get_all_plugin_names, deactivate_plugin_by_name, activate_plugin_by_name,
+    get_plugin_obj_by_name, update_plugin_places
 )
 
 BL_PLUGINS = b'bl_plugins'
 
 logger = log.logger
-
-
-def get_class_that_defined_method(meth):
-    for cls in inspect.getmro(type(meth.__self__)):
-        if meth.__name__ in cls.__dict__:
-            return cls
-    return None
 
 
 __author__ = 'Konglx'
@@ -203,7 +191,7 @@ class TomBot(Backend, StoreMixin):
         logger.info('Shutting down...')
         deactivate_all_plugins()
         self.close_storage()
-        store.shelf.close()
+        holder.session_store.shelf.close()
         self.loop.stop()
         logger.info('Shutdown complete. Bye')
 
