@@ -59,18 +59,18 @@ def main():
         frontend.bind(config.server_socket)
         # frontend.curve_server = True
 
-        # public_key, secret_key = zmq.auth.load_certificate(config.home + os.sep + 'certs' + os.sep + 'tom.key_secret')
-        # logger.debug('Pub Key: {0}, Secret Key: {1}'.format(certs[''], secret_key))
+        # public_key, secret_key = zmq.auth.load_certificate(config.home + os.sep + 'crypt' + os.sep + 'tom.key_secret')
+        # logger.debug('Pub Key: {0}, Secret Key: {1}'.format(crypt[''], secret_key))
         # frontend.curve_secretkey = secret_key
         # frontend.curve_publickey = public_key
 
         # if zmq.zmq_version_info() < (4, 0):
-        #     logger.warn('WARNING: ZMQ version must be higher than 4.0 for security communication')
+        #     logger.warn('WARNING: ZMQ version must be higher than 4.0 for crypt communication')
         # else:
-        #     # configure CURVE security
+        #     # configure CURVE crypt
         #     auth_thread = ThreadAuthenticator(context=context, log=logger)
         #     auth_thread.start()
-        #     auth_thread.configure_curve(location=config.home + '/certs')
+        #     auth_thread.configure_curve(location=config.home + '/crypt')
 
         backend = context.socket(zmq.DEALER)
         backend.bind('ipc://{0}/broker.ipc'.format(config.ipc_path))

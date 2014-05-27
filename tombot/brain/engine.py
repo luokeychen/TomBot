@@ -106,7 +106,7 @@ class Message(object):
         self.msg = message
         self.message_id = uuid1()
         self.identity = message[0]
-        msg_body = json.loads(message[1])
+        msg_body = json.loads(message[1]) if isinstance(message[1], str) else message[1]
 
         self.content = msg_body['content']
         self.msg_type = msg_body['type']
@@ -118,13 +118,6 @@ class Message(object):
 
     def set_style(self, style):
         self.style = style
-
-    def _split_chunk(self, string, length):
-        if length >= 4096:
-            logger.warn("Page too long, may can't be proceed")
-
-        lines = textwrap.wrap(string, width=length)
-        return lines
 
     def get_input(self, tip=None):
         if tip:

@@ -60,10 +60,11 @@ TODO
  * 可自由添加/减少backend dep
  * 针对用户的命令上下文 done
  * 添加数据库支持 done
- * 增加权限管理
+ * 增加权限管理 done
  * SSH
  * 考虑增强zmq的安全性
  * 整理、规范logging done
  * 整合wssh
  * 分页，支持读取用户输入  done
- * REST API done
+ * REST API done 70%
+ * consider to replace zmq with raet

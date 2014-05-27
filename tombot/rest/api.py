@@ -15,6 +15,7 @@ from tornado.web import Application
 from tornado.httpserver import HTTPServer
 from tornado.escape import json_decode
 import tornado.ioloop
+import json
 
 from tombot.common import log
 from tombot.common import config
@@ -59,8 +60,10 @@ class SendHandler(MainHandler):
         msg = json_decode(self.request.body)
         content = config.main_name + ' ' + msg['command'] + ' ' + msg['args']
         msg['content'] = content
-        logger.debug(msg)
-        msg_obj = Message(msg)
+        logger.debug('MSG: {}'.format(msg))
+        identity = msg.get('identity') or 'WEBAPI'
+        msg_body = [identity, json.dumps(msg)]
+        msg_obj = Message(msg_body)
         msg_obj.id = msg['id'] or 'NotProvided'
         msg_obj.id = msg['user'] or 'NotProvided'
         msg_obj.send(msg_obj.content)
@@ -70,6 +73,13 @@ class ChatHandler(MainHandler):
     @asynchronous
     def post(self, *args, **kwargs):
         msg = json_decode(self.request.body)
+        content = config.main_name + ' ' + msg['command'] + ' ' + msg['args']
+        msg['content'] = content
+        identity = msg.get('identity') or 'WEBAPI'
+        msg_body = [identity, json.dumps(msg)]
+        msg_obj = Message(msg_body)
+        msg_obj.id = msg['id'] or 'NotProvided'
+        msg_obj.id = msg['user'] or 'NotProvided'
         proxy.send(msg)
 
     @asynchronous

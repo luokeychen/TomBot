@@ -1644,9 +1644,9 @@ class _EmailMessage:
         else:
             sendmail = webapi.config.get('sendmail_path', '/usr/sbin/sendmail')
 
-            assert not self.from_address.startswith('-'), 'security'
+            assert not self.from_address.startswith('-'), 'crypt'
             for r in self.recipients:
-                assert not r.startswith('-'), 'security'
+                assert not r.startswith('-'), 'crypt'
 
             cmd = [sendmail, '-f', self.from_address] + self.recipients
 

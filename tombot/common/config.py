@@ -86,4 +86,5 @@ admins = yaml_dict['backend'].get('admins') or 'konglx'
 prefix = yaml_dict['backend'].get('prefix') or '!'
 bot_alt_separators = yaml_dict['backend'].get('bot_alt_separators')
 
+#TODO generate md5 string and save it to file after first start
 admin_pass = 'test'
