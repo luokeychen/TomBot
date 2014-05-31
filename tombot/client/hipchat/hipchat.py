@@ -52,7 +52,6 @@ class HipChat(ClientXMPP):
         self.ca_certs = '/etc/ssl/certs/ca-certificates.crt'
 
         self.add_event_handler('session_start', self.session_start)
-        # self.add_event_handler('groupchat_message', self.handle_message)
         self.add_event_handler('message', self.handle_message)
         self.add_event_handler('groupchat_invite', self.auto_accept_invite)
 
@@ -60,10 +59,28 @@ class HipChat(ClientXMPP):
         zmq_thread.daemon = True
         zmq_thread.start()
 
+        self.rooms = []
+        with file('./rooms.json', 'r') as fp:
+            try:
+                self.rooms = json.load(fp)
+            except ValueError as _:
+                self.rooms = []
+
+        self.recovery_rooms_on_startup(self.rooms)
+
+    def recovery_rooms_on_startup(self, rooms):
+        for room in rooms:
+            muc = self.plugin['xep_0045']
+            muc.joinMUC(room, nick=NICK_NAME, wait=True)
+
     def auto_accept_invite(self, message):
         room = message['from']
         muc = self.plugin['xep_0045']
         muc.joinMUC(room, nick=NICK_NAME, wait=True)
+        self.rooms.append(str(room))
+        logger.debug('Rooms: {}'.format(self.rooms))
+        with open('./rooms.json', 'w') as fp:
+            json.dump(self.rooms, fp)
 
     def session_start(self, event):
         self.get_roster()
