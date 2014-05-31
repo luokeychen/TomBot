@@ -95,6 +95,10 @@ def re_botcmd(*args, **kwargs):
         return lambda func: decorate(func, **kwargs)
 
 
+class InvalidMessageError(Exception):
+    pass
+
+
 class Message(object):
     '''包装消息，方便保存上下文
 
@@ -105,6 +109,8 @@ class Message(object):
     def __init__(self, message):
         self.msg = message
         self.message_id = uuid1()
+        if len(message) < 2:
+            raise InvalidMessageError('Message length is {}, expect 2'.format(len(message)))
         self.identity = message[0]
         msg_body = json.loads(message[1]) if isinstance(message[1], str) else message[1]
 
@@ -154,13 +160,14 @@ class Message(object):
             content = '执行结果为空'
             style = const.ERROR_STYLE
 
-        elif len(content) > 4096:
-            warn_msg = make_msg(1, '消息过长，只显示部分内容', self.user,
-                                self.msg_type, self.id, const.WARNING_STYLE)
-
-            self.socket.send_multipart([self.identity,
-                                        json.dumps(warn_msg)])
-            content = content[:4096]
+        # for QQ, too long message may block by tencent
+        # elif len(content) > 4096:
+        #     warn_msg = make_msg(1, '消息过长，只显示部分内容', self.user,
+        #                         self.msg_type, self.id, const.WARNING_STYLE)
+        #
+        #     self.socket.send_multipart([self.identity,
+        #                                 json.dumps(warn_msg)])
+        #     content = content[:4096]
         msg = make_msg(retcode=retcode, content=content, user=self.user,
                        type_=self.msg_type, id_=self.id, style=self.style)
 

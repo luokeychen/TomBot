@@ -17,7 +17,8 @@ from sleekxmpp import ClientXMPP
 from tombot.common.log import logger
 
 
-JABBER_ID = '94499_883553@chat.hipchat.com'
+# hipchat automatically sent history unless JID resource is bot
+JABBER_ID = '94499_883553@chat.hipchat.com/bot'
 PASSWORD = 'jay19880821'
 ROOM_ID = '94499_ffcs@conf.hipchat.com'
 NICK_NAME = 'tom bot'
@@ -45,7 +46,8 @@ class HipChat(ClientXMPP):
         self.auto_authorize = True
         self.auto_subscribe = True
         self.whitespace_keepalive = True
-        self.whiteapace_keepalive_interval = 5
+        self.whitespace_keepalive_interval = 60
+        self.end_session_on_disconnect = False
 
         self.ca_certs = '/etc/ssl/certs/ca-certificates.crt'
 
@@ -63,12 +65,9 @@ class HipChat(ClientXMPP):
         muc = self.plugin['xep_0045']
         muc.joinMUC(room, nick=NICK_NAME, wait=True)
 
-        # muc.joinMUC(room, JABBER_ID, PASSWORD, wait=True)
-
     def session_start(self, event):
         self.get_roster()
         self.send_presence()
-        # self.plugin['xep_0045'].join_room(ROOM_ID)
 
     def handle_message(self, message):
         type = message['type']

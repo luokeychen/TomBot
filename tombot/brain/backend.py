@@ -40,6 +40,7 @@ from collections import defaultdict, deque
 import zmq
 from zmq.eventloop import ioloop
 import traceback
+import base64
 
 from tombot.brain import holder
 from tombot.common import log, config
@@ -331,7 +332,7 @@ class Backend(object):
         if (cmd, args) in user_cmd_history:
             user_cmd_history.remove((cmd, args))  # Avoids duplicate history items
 
-        if mess.user not in [str(a) for a in self.admins]:
+        if mess.user not in [base64.encodestring(a) for a in self.admins]:
             try:
                 self.check_command_access(mess, cmd)
             except ACLViolation as e:
