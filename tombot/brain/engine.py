@@ -112,6 +112,8 @@ class Message(object):
         self.msg_type = msg_body['type']
         self.user = msg_body['user']
         self.id = msg_body['id']
+        # could be plain or html, default plain
+        self.html = msg_body.get('html') or False
         self.style = msg_body.get('style') or const.DEFAULT_STYLE
         self.socket = holder.broker_socket
         self.session = None
@@ -144,7 +146,7 @@ class Message(object):
             except StopIteration:
                 self.warn('No more content to display.')
 
-    def send(self, content, retcode=0, user=None, split=0):
+    def send(self, content, html=False, retcode=0, user=None):
         # if not isinstance(self.content, str) or not isinstance(self.content, unicode):
         #     logger.warn('Message content is not `str` or `unicode`, can not be send!')
         #     return
@@ -152,10 +154,6 @@ class Message(object):
             content = '执行结果为空'
             style = const.ERROR_STYLE
 
-        if split > 0:
-            lines = self._split_chunk(content, split)
-            for line in lines:
-                pass
         elif len(content) > 4096:
             warn_msg = make_msg(1, '消息过长，只显示部分内容', self.user,
                                 self.msg_type, self.id, const.WARNING_STYLE)

@@ -295,7 +295,7 @@ class Session(object):
 
     @staticmethod
     def generate_session_id(rid, uid):
-        session_id = sha1('{0}{1}'.format(rid, uid))
+        session_id = sha1('{0}{1}'.format(rid.encode('utf-8'), uid.encode('utf-8')))
         session_id = session_id.hexdigest()
         return session_id
 

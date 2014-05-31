@@ -204,7 +204,7 @@ class Backend(object):
         user_cmd_history = self.cmd_history[username]
 
         # 3 types of QQ chat, there's sess msg_type for non-friend talk, but with crypt issue, don't use it
-        if msg_type not in ('buddy', 'group', 'discu', 'api'):
+        if msg_type not in ('buddy', 'group', 'discu', 'api', 'chat', 'groupchat'):
             logger.warn("unhandled message msg_type %s" % mess)
             return False
 
