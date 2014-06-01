@@ -43,6 +43,7 @@ import traceback
 import base64
 
 from tombot.brain import holder
+from tombot.brain.templating import tenv
 from tombot.common import log, config
 from tombot.common.threadpool import WorkRequest
 from tombot.common.utils import split_string_after
@@ -51,7 +52,6 @@ from tombot.common.utils import split_string_after
 ioloop.install()
 
 from session import Room, RoomManager
-from engine import botcmd
 
 _path = os.path.abspath(os.path.dirname(__file__))
 
@@ -189,7 +189,7 @@ class Backend(object):
         :param mess: Message object
         """
         # TODO Make it possible to convert from uin to QQ number.
-        return mess.user
+        return mess['user']
 
     def callback_message(self, mess):
         """
@@ -197,10 +197,10 @@ class Backend(object):
         """
         # Prepare to handle either private chats or group chats
 
-        msg_type = mess.msg_type
-        user = mess.user
-        message_id = mess.message_id
-        content = mess.content
+        msg_type = mess['type']
+        user = mess['user']
+        message_id = mess['message_id']
+        content = mess['content']
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
 
@@ -325,14 +325,14 @@ class Backend(object):
         """Process and execute a bot command"""
         logger.info(u"Processing command {} with parameters '{}'".format(cmd, args))
 
-        user = mess.user
+        user = mess['user']
         username = self.get_sender_username(mess)
         user_cmd_history = self.cmd_history[username]
 
         if (cmd, args) in user_cmd_history:
             user_cmd_history.remove((cmd, args))  # Avoids duplicate history items
 
-        if mess.user not in [base64.encodestring(a) for a in self.admins]:
+        if user not in [base64.encodestring(a) for a in self.admins]:
             try:
                 self.check_command_access(mess, cmd)
             except ACLViolation as e:
@@ -353,12 +353,13 @@ class Backend(object):
         if not match and f._tom_command_split_args_with != '':
             args = args.split(f._tom_command_split_args_with)
         wr = WorkRequest(self._execute_and_send,
-            [], {'cmd': cmd, 'args': args, 'match': match, 'mess': mess, 'user': user})
+            [], {'cmd': cmd, 'args': args, 'match': match, 'mess': mess, 'user': user,
+                 'template_name': f._tom_command_template})
         self.thread_pool.put_request(wr)
         if f._tom_command_admin_only:
             self.thread_pool.wait()  # Again wait for the completion before accepting a new command that could generate weird concurrency issues
 
-    def _execute_and_send(self, cmd, args, match, mess, user):
+    def _execute_and_send(self, cmd, args, match, mess, user, template_name=None):
         """Execute a bot command and send output back to the caller
 
         cmd: The command that was given to the bot (after being expanded)
@@ -373,14 +374,16 @@ class Backend(object):
 
         def process_reply(reply):
             # integrated templating
-            # if template_name:
-            #     reply = tenv().get_template(template_name + '.html').render(**reply)
+            if template_name:
+                mess['html'] = True
+                reply = tenv().get_template(template_name + '.html').render(**reply)
 
             # Reply should be all text at this point (See https://github.com/gbin/err/issues/96)
             return str(reply)
 
         def send_reply(reply):
-            if mess.msg_type == 'api' or (reply) <= self.MESSAGE_SIZE_LIMIT:
+            if mess['type'] == 'api' or (reply) <= self.MESSAGE_SIZE_LIMIT:
+                # FIXME temporary disable reply split
                 self.send_simple_reply(mess, reply)
             else:
                 mess.session['outbox'] = split_string_after(reply, self.MESSAGE_SIZE_LIMIT)
@@ -401,7 +404,7 @@ class Backend(object):
             tb = traceback.format_exc()
             logger.exception('An error happened while processing '
                              'a message ("%s") from %s: %s"' %
-                             (mess.content, mess.user, tb))
+                             (mess['content'], mess['user'], tb))
             send_reply(self.MSG_ERROR_OCCURRED + ':\n %s' % e)
 
     def serve_forever(self):

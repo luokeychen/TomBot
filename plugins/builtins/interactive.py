@@ -39,5 +39,5 @@ from tombot import BuiltinEngine
 
 class Interactive(BuiltinEngine):
     def callback_message(self, message):
-        if message.content.strip() == 'more':
+        if message['content'].strip() == 'more':
             message.send_next()

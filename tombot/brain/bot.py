@@ -71,8 +71,8 @@ class TomBot(Backend, StoreMixin):
         logger.debug('Receive message from client: {}'.format(message[0]))
         logger.debug('Full message body: {}'.format(message))
         msg_obj = Message(message)
-        session_id = Session.generate_session_id(msg_obj.id, msg_obj.user)
-        self.sessions[session_id] = self.sessions.get(session_id) or Session(msg_obj.id, msg_obj.user)
+        session_id = Session.generate_session_id(msg_obj['id'], msg_obj['user'])
+        self.sessions[session_id] = self.sessions.get(session_id) or Session(msg_obj['id'], msg_obj['user'])
         current_session = self.sessions[session_id]
         logger.debug('Global Sessions: {}'.format(self.sessions))
         logger.debug('Current session: {}'.format(current_session._data))
@@ -80,7 +80,7 @@ class TomBot(Backend, StoreMixin):
 
         if msg_obj.session['is_wait']:
             # BUG actually, needs a lock here if user type fast enough
-            msg_obj.session.queue.put(msg_obj.content)
+            msg_obj.session.queue.put(msg_obj['content'])
             return
 
         if super(TomBot, self).callback_message(msg_obj):

@@ -44,7 +44,7 @@ class BotAdmin(BuiltinEngine):
             message.warn('Authentication failed!!!')
 
     #noinspection PyUnusedLocal
-    @botcmd
+    @botcmd(template='status')
     def status(self, mess, args):
         """ If I am alive I should be able to respond to this one
         """
@@ -74,7 +74,7 @@ class BotAdmin(BuiltinEngine):
             loads = None
 
         # plugins_statuses = sorted(plugins_statuses, key=lambda c: c[2])
-        return pformat({'plugins': plugins_statuses, 'loads': loads, 'gc': gc.get_count()})
+        return {'plugins': plugins_statuses, 'loads': loads, 'gc': gc.get_count()}
 
     #noinspection PyUnusedLocal
     @botcmd

@@ -43,6 +43,7 @@ from yapsy.PluginManager import PluginManager
 from tombot.brain import holder
 from tombot.common import log, config
 from tombot.brain.engine import Engine, AnsibleEngine, BuiltinEngine
+from tombot.brain.templating import add_plugin_templates_path, remove_plugin_templates_path
 
 
 logger = log.logger
@@ -119,10 +120,12 @@ def activate_plugin_by_name(name):
     # obj = pta_item.plugin_object
 
     populate_doc(pta_item)
+    add_plugin_templates_path(pta_item.path)
     try:
         return tom_plugin_manager.activatePluginByName(name, pta_item.category)
     except Exception as _:
         pta_item.activated = False  # Yapsy doesn't revert this in case of error
+        remove_plugin_templates_path(pta_item.path)
         logger.error("Plugin %s failed at activation stage, deactivating it..." % name)
         tom_plugin_manager.deactivatePluginByName(name, pta_item.category)
         raise
@@ -131,9 +134,11 @@ def activate_plugin_by_name(name):
 def deactivate_plugin_by_name(name):
     pta_item = get_plugin_by_name(name)
     # obj = pta_item.plugin_object
+    remove_plugin_templates_path(pta_item.path)
     try:
         return tom_plugin_manager.deactivatePluginByName(name, pta_item.category)
     except Exception as _:
+        add_plugin_templates_path(pta_item.path)
         raise
 
 

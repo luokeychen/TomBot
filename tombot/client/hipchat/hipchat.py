@@ -7,9 +7,13 @@
 # Description:
 import json
 import os
+import re
+from urllib import urlencode
+from urllib2 import Request, urlopen
 import yaml
 import zmq
 import threading
+from tombot.common.utils import REMOVE_EOL, utf8
 
 __author__ = 'Konglx'
 
@@ -22,6 +26,26 @@ JABBER_ID = '94499_883553@chat.hipchat.com/bot'
 PASSWORD = 'jay19880821'
 ROOM_ID = '94499_ffcs@conf.hipchat.com'
 NICK_NAME = 'tom bot'
+
+HIPCHAT_FORCE_PRE = re.compile(r'<body>', re.I)
+HIPCHAT_FORCE_SLASH_PRE = re.compile(r'</body>', re.I)
+HIPCHAT_EOLS = re.compile(r'</p>|</li>', re.I)
+HIPCHAT_BOLS = re.compile(r'<p [^>]+>|<li [^>]+>', re.I)
+
+HIPCHAT_MESSAGE_URL = 'https://api.hipchat.com/v1/rooms/message'
+
+
+def xhtml2hipchat(xhtml):
+    # Hipchat has a really limited html support
+    retarded_hipchat_html_plain = REMOVE_EOL.sub('', xhtml)  # Ignore formatting
+    retarded_hipchat_html_plain = HIPCHAT_EOLS.sub('<br/>',
+                                                   retarded_hipchat_html_plain)  # readd the \n where they probably fit best
+    retarded_hipchat_html_plain = HIPCHAT_BOLS.sub('', retarded_hipchat_html_plain)  # zap every tag left
+    retarded_hipchat_html_plain = HIPCHAT_FORCE_PRE.sub('<body><pre>', retarded_hipchat_html_plain)  # fixor pre
+    retarded_hipchat_html_plain = HIPCHAT_FORCE_SLASH_PRE.sub('</pre></body>',
+                                                              retarded_hipchat_html_plain)  # fixor /pre
+    return retarded_hipchat_html_plain
+
 
 context = zmq.Context(1)
 socket = context.socket(zmq.DEALER)
@@ -42,6 +66,9 @@ class HipChat(ClientXMPP):
         self.register_plugin('xep_0203')  # XMPP Delayed messages
         self.register_plugin('xep_0249')  # XMPP direct MUC invites
         self.register_plugin('xep_0060')  # PubSub
+        # self.register_plugin('xep_0071')
+
+        self.token = '1adc4b41b4b795eefbcfe1ac9fdfca'
 
         self.auto_authorize = True
         self.auto_subscribe = True
@@ -67,6 +94,12 @@ class HipChat(ClientXMPP):
                 self.rooms = []
 
         self.recovery_rooms_on_startup(self.rooms)
+
+    def send_api_message(self, room_id, fr, message, message_format='html'):
+        base = {'format': 'json', 'auth_token': self.token}
+        red_data = {'room_id': room_id, 'from': fr, 'message': utf8(message), 'message_format': message_format}
+        req = Request(url=HIPCHAT_MESSAGE_URL + '?' + urlencode(base), data=urlencode(red_data))
+        return json.load(urlopen(req))
 
     def recovery_rooms_on_startup(self, rooms):
         for room in rooms:
@@ -104,12 +137,26 @@ class HipChat(ClientXMPP):
 
     def zmq_handler(self):
         while True:
+            xmppmsg = self.Message()
             message = socket.recv_json()
             # message = json.loads(message[0])
-            logger.debug('hipchat receive message {}'.format(message))
-            self.send_message(mto=message['id'],
-                              mbody=message['content'],
-                              mtype=message['type'])
+            if message['html']:
+                logger.debug('hipchat receive html message {}'.format(message))
+                # html_content = xhtml2hipchat(message['content'])
+                # self.send_message(mto=message['id'],
+                #                   mbody='',
+                #                   mtype=message['type'],
+                #                   mhtml=html_content)
+                xmppmsg['to'] = message['id']
+                xmppmsg['body'] = ''
+                xmppmsg['type'] = message['type']
+                xmppmsg['html']['body'] = message['content']
+                xmppmsg.send()
+            else:
+                logger.debug('hipchat receive message {}'.format(message))
+                self.send_message(mto=message['id'],
+                                  mbody=message['content'],
+                                  mtype=message['type'])
 
 
 if __name__ == "__main__":

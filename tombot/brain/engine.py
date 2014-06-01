@@ -108,24 +108,25 @@ class Message(object):
     #retcode: 0 normal 101 warn 102 error 1001 null
     def __init__(self, message):
         self.msg = message
-        self.message_id = uuid1()
         if len(message) < 2:
             raise InvalidMessageError('Message length is {}, expect 2'.format(len(message)))
         self.identity = message[0]
-        msg_body = json.loads(message[1]) if isinstance(message[1], str) else message[1]
+        self._data = json.loads(message[1]) if isinstance(message[1], str) else message[1]
 
-        self.content = msg_body['content']
-        self.msg_type = msg_body['type']
-        self.user = msg_body['user']
-        self.id = msg_body['id']
+        self._data['message_id'] = str(uuid1())
+
         # could be plain or html, default plain
-        self.html = msg_body.get('html') or False
-        self.style = msg_body.get('style') or const.DEFAULT_STYLE
+        self.html = self._data.get('html') or False
+        self._data['style'] = self._data.get('style') or const.DEFAULT_STYLE
         self.socket = holder.broker_socket
         self.session = None
 
-    def set_style(self, style):
-        self.style = style
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __getitem__(self, item):
+        return self._data.get(item)
 
     def get_input(self, tip=None):
         if tip:
@@ -147,12 +148,12 @@ class Message(object):
         else:
             try:
                 out_msg = self.session['outbox'].next()
-                out_msg += '\nType more to see more details.'
+                # out_msg += '\nType more to see more details.'
                 self.send(out_msg)
             except StopIteration:
                 self.warn('No more content to display.')
 
-    def send(self, content, html=False, retcode=0, user=None):
+    def send(self, content, retcode=0):
         # if not isinstance(self.content, str) or not isinstance(self.content, unicode):
         #     logger.warn('Message content is not `str` or `unicode`, can not be send!')
         #     return
@@ -168,13 +169,14 @@ class Message(object):
         #     self.socket.send_multipart([self.identity,
         #                                 json.dumps(warn_msg)])
         #     content = content[:4096]
-        msg = make_msg(retcode=retcode, content=content, user=self.user,
-                       type_=self.msg_type, id_=self.id, style=self.style)
-
+        # msg = make_msg(retcode=retcode, content=content, user=self.user,
+        #                type_=self.msg_type, id_=self.id, style=self.style)
+        self._data['content'] = content
+        self._data['retcode'] = retcode
         self.socket.send_multipart([self.identity,
-                                    json.dumps(msg)])
+                                    json.dumps(self._data)])
 
-        logger.info('Push message to Client: {0!r}'.format(msg))
+        logger.info('Push message to Client: {0!r}'.format(self._data))
 
     def ok(self, content):
         self.send(content, retcode=0)

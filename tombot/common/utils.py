@@ -67,10 +67,10 @@ __all__ = [
 ]
 
 import threading
+import itertools
 import sys
 import re
 import time
-import itertools
 
 try:
     import subprocess
@@ -434,7 +434,7 @@ def safestr(obj, encoding='utf-8'):
         return str(obj)
 
 # for backward-compatibility
-utf8 = safestr
+# utf8 = safestr
 
 
 class TimeoutError(Exception): pass
