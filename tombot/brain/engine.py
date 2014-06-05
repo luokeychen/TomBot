@@ -116,7 +116,8 @@ class Message(object):
         self._data['message_id'] = str(uuid1())
 
         # could be plain or html, default plain
-        self.html = self._data.get('html') or False
+        self.html = None
+        self._data['html'] = None
         self._data['style'] = self._data.get('style') or const.DEFAULT_STYLE
         self.socket = holder.broker_socket
         self.session = None
@@ -171,7 +172,7 @@ class Message(object):
         #     content = content[:4096]
         # msg = make_msg(retcode=retcode, content=content, user=self.user,
         #                type_=self.msg_type, id_=self.id, style=self.style)
-        self._data['content'] = content
+        self._data['content'] = str(content)
         self._data['retcode'] = retcode
         self.socket.send_multipart([self.identity,
                                     json.dumps(self._data)])

@@ -13,13 +13,14 @@ from urllib2 import Request, urlopen
 import yaml
 import zmq
 import threading
-from tombot.common.utils import REMOVE_EOL, utf8
+from tombot.common.utils import REMOVE_EOL, utf8, mess_2_embeddablehtml
 
 __author__ = 'Konglx'
 
 from sleekxmpp import ClientXMPP
+from hypchat import HypChat
 from tombot.common.log import logger
-
+from tornado.web import escape
 
 # hipchat automatically sent history unless JID resource is bot
 JABBER_ID = '94499_883553@chat.hipchat.com/bot'
@@ -33,6 +34,7 @@ HIPCHAT_EOLS = re.compile(r'</p>|</li>', re.I)
 HIPCHAT_BOLS = re.compile(r'<p [^>]+>|<li [^>]+>', re.I)
 
 HIPCHAT_MESSAGE_URL = 'https://api.hipchat.com/v1/rooms/message'
+TOKEN = 'DZttvKCWeU4GpXxoqwJc4IG8bH636MjaCmLNZqc8'
 
 
 def xhtml2hipchat(xhtml):
@@ -68,8 +70,6 @@ class HipChat(ClientXMPP):
         self.register_plugin('xep_0060')  # PubSub
         # self.register_plugin('xep_0071')
 
-        self.token = '1adc4b41b4b795eefbcfe1ac9fdfca'
-
         self.auto_authorize = True
         self.auto_subscribe = True
         self.whitespace_keepalive = True
@@ -87,6 +87,11 @@ class HipChat(ClientXMPP):
         zmq_thread.start()
 
         self.rooms = []
+
+        self.api_conn = HypChat(TOKEN)
+
+        self.rooms_in_hipchat = self.api_conn.rooms(expand='items')
+
         with file('./rooms.json', 'r') as fp:
             try:
                 self.rooms = json.load(fp)
@@ -124,7 +129,8 @@ class HipChat(ClientXMPP):
         if type not in ('chat', 'groupchat'):
             return
         content = message['body']
-        id = unicode(message['from'])
+        message['from'] = re.sub(r'/.*$', '', str(message['from']))
+        id = str(message['from'])
         # xmpp only, qq is different
         user = id
 
@@ -137,26 +143,26 @@ class HipChat(ClientXMPP):
 
     def zmq_handler(self):
         while True:
-            xmppmsg = self.Message()
+            # xmppmsg = self.Message()
             message = socket.recv_json()
             # message = json.loads(message[0])
             if message['html']:
                 logger.debug('hipchat receive html message {}'.format(message))
-                # html_content = xhtml2hipchat(message['content'])
-                # self.send_message(mto=message['id'],
-                #                   mbody='',
-                #                   mtype=message['type'],
-                #                   mhtml=html_content)
-                xmppmsg['to'] = message['id']
-                xmppmsg['body'] = ''
-                xmppmsg['type'] = message['type']
-                xmppmsg['html']['body'] = message['content']
-                xmppmsg.send()
+                # content = xhtml2hipchat(message['html'])
+                room = self.get_room_by_jid(message['id'])
+                content = message['content']
+                room.notification(content, color='random', notify=True, format='html')
             else:
                 logger.debug('hipchat receive message {}'.format(message))
                 self.send_message(mto=message['id'],
                                   mbody=message['content'],
                                   mtype=message['type'])
+
+    def get_room_by_jid(self, room_jid):
+        for r in self.rooms_in_hipchat['items']:
+            if r['xmpp_jid'] == room_jid:
+                return r
+        return None
 
 
 if __name__ == "__main__":

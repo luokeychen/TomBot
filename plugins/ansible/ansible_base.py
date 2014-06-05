@@ -71,3 +71,7 @@ class AnsibleBase(AnsibleEngine):
             return result
         else:
             return '禁止执行的命令!'
+
+    @botcmd
+    def list_playbook(self, message, args):
+        message.send(common.get_all_playbooks())

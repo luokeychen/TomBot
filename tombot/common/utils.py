@@ -433,6 +433,7 @@ def safestr(obj, encoding='utf-8'):
     else:
         return str(obj)
 
+
 # for backward-compatibility
 # utf8 = safestr
 
@@ -1877,7 +1878,7 @@ def utf8(key):
 
 
 def mess_2_embeddablehtml(mess):
-    html_content = mess.getHTML()
+    html_content = mess.html
     if html_content is not None:
         body = html_content.find('{rest://jabber.org/protocol/xhtml-im}body')
         result = ''
@@ -1885,7 +1886,7 @@ def mess_2_embeddablehtml(mess):
             result += tostring(child).decode().replace('ns0:', '')
         return result, True
     else:
-        return mess.getBody(), False
+        return mess.html, False
 
 
 def parse_jid(jid):

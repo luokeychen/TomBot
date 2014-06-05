@@ -37,16 +37,18 @@ import difflib
 import os
 import inspect
 from collections import defaultdict, deque
+from xml.etree.ElementTree import ParseError
 import zmq
 from zmq.eventloop import ioloop
 import traceback
 import base64
+from xml.etree import cElementTree as ET
 
 from tombot.brain import holder
 from tombot.brain.templating import tenv
 from tombot.common import log, config
 from tombot.common.threadpool import WorkRequest
-from tombot.common.utils import split_string_after
+from tombot.common.utils import split_string_after, xhtml2txt
 
 
 ioloop.install()
@@ -97,6 +99,18 @@ class ACLViolation(Exception):
 #             raise ACLViolation("You cannot administer the bot from a chatroom, message the bot directly")
 #         if usr not in BOT_ADMINS:
 #             raise ACLViolation("This command requires bot-admin privileges")
+def build_text_html_message_pair(source):
+    node = None
+    text_plain = None
+
+    try:
+        node = ET.XML(source)
+        text_plain = xhtml2txt(source)
+    except ParseError as ee:
+        if source.strip():  # avoids keep alive pollution
+            logger.debug('Could not parse [%s] as XHTML-IM, assume pure text Parsing error = [%s]' % (source, ee))
+            text_plain = source
+    return text_plain, node
 
 
 class Backend(object):
@@ -375,11 +389,12 @@ class Backend(object):
         def process_reply(reply):
             # integrated templating
             if template_name:
-                mess['html'] = True
                 reply = tenv().get_template(template_name + '.html').render(**reply)
+                mess['content'], mess.html = build_text_html_message_pair(str(reply))
+                mess['html'] = reply
 
             # Reply should be all text at this point (See https://github.com/gbin/err/issues/96)
-            return str(reply)
+            return reply
 
         def send_reply(reply):
             if mess['type'] == 'api' or (reply) <= self.MESSAGE_SIZE_LIMIT:
