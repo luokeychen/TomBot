@@ -1,30 +1,28 @@
-{#{% extends "base.html" %}#}
+{# Hipchat only supports: a, b, i, strong, em, br, img, pre, code, lists, tables #}
 {% macro status(name) -%}
 {% if name == 'L' -%}
-<span style='font-weight:bold; color:green'>L</span>
+    L
 {%- elif name == 'U' -%}
-<span style='font-weight:bold'>U</span>
+    U
 {%- elif name == 'C' -%}
-<span style='font-weight:bold; color:red'>C</span>
+    <b>C</b>
 {%- elif name == 'B' -%}
-<span style='font-weight:bold'>B</span>
+    <b>B</b>
 {%- elif name == 'BL' -%}
-<span style='font-weight:bold'>B</span>,<span style='font-weight:bold; color:green'>L</span>
+    <b>BL</b>
 {%- elif name == 'BU' -%}
-<span style='font-weight:bold'>B</span>,<span style='font-weight:bold'>U</span>
+    <b>BU</b>
 {%- endif %}
 {%- endmacro %}
 {% block body %}
-<div style="font-family: monospace">
-    <p style='margin-top: 0; margin-bottom: 0;'><span style='font-weight:bold;'>Yes I am alive...</span><br/>
-        With these plugins ({{status('L')}}=Loaded, {{status('U')}}=Unloaded, {{status('B')}}=Blacklisted,
+    <b>Yes I am alive...</b>
+    <br/>
+    With these plugins ({{status('L')}}=Loaded, {{status('U')}}=Unloaded, {{status('B')}}=Blacklisted,
         {{status('C')}}=Needs to be configured):<br/>
-        {% for state, name in plugins_statuses %}
-        [{{status(state)}}] {{ name }}<br/>
-        {% endfor %}</p>
+    {% for state, name, module in plugins_statuses %}
+        [{{ status(state) }}] {{ name }} {{ module }}<br/>
+    {% endfor %}
 
-    <p style='margin-top: 10px; margin-bottom: 0; margin-left:15px;'>
-        Load {{loads[0]}}, {{loads[1]}}, {{loads[2]}}<br/>
-        GC 0->{{gc[0]}} 1->{{gc[1]}} 2->{{gc[2]}}</p>
-</div>
+    Load {{loads[0]}}, {{loads[1]}}, {{loads[2]}}<br/>
+        GC 0->{{gc[0]}} 1->{{gc[1]}} 2->{{gc[2]}}
 {% endblock %}

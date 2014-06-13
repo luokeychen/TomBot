@@ -390,8 +390,9 @@ class Backend(object):
             # integrated templating
             if template_name:
                 reply = tenv().get_template(template_name + '.html').render(**reply)
-                mess['content'], mess.html = build_text_html_message_pair(str(reply))
+                # mess['content'], mess.html = build_text_html_message_pair(str(reply))
                 mess['html'] = reply
+                mess['content'] = reply
 
             # Reply should be all text at this point (See https://github.com/gbin/err/issues/96)
             return reply
