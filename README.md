@@ -68,3 +68,5 @@ TODO
  * 分页，支持读取用户输入  done
  * REST API done 70%
  * consider to replace zmq with raet
+ * Support Hipchat done
+ * 由于代码和Err越来越像，于是干脆搬了一些代码过来 done
