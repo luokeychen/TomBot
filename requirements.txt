@@ -1,0 +1,9 @@
+tornado
+pyzmq
+pyyaml
+bottle
+yapsy
+hypchat
+sleekxmpp
+Jinja2
+twqq
